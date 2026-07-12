@@ -71,7 +71,7 @@ describe('LibrarySection accessibility', () => {
     expect(screen.getByRole('combobox', { name: 'Filter by source' })).toBeTruthy();
   });
 
-  it('renders the Resources workbench with a persistent preview inspector', async () => {
+  it('keeps the preview inspector empty until the user activates a resource', async () => {
     render(<LibrarySection active onOpenProject={() => {}} />);
 
     await screen.findAllByText('A photo');
@@ -79,8 +79,40 @@ describe('LibrarySection accessibility', () => {
     expect(screen.getByRole('complementary', { name: 'Resource filters' })).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Resource results' })).toBeTruthy();
     expect(screen.getByRole('complementary', { name: 'Preview inspector' })).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'A photo' })).toBeTruthy();
+    expect(screen.getByText('Select a resource')).toBeTruthy();
+    expect(screen.queryByRole('img', { name: 'A photo' })).toBeNull();
     expect(screen.getByRole('button', { name: 'List' })).toBeTruthy();
+  });
+
+  it('marks the activated card independently from batch selection', async () => {
+    fetchLibraryAssets.mockResolvedValue([
+      makeAsset({ id: 'alpha', sourceTitle: 'Alpha' }),
+      makeAsset({ id: 'beta', sourceTitle: 'Beta' }),
+    ]);
+    render(<LibrarySection active onOpenProject={() => {}} />);
+
+    const alpha = await screen.findByRole('button', { name: 'Preview Alpha' });
+    const beta = screen.getByRole('button', { name: 'Preview Beta' });
+    fireEvent.click(alpha);
+    expect(alpha.closest('[data-asset-card]')?.getAttribute('data-active')).toBe('true');
+
+    fireEvent.click(beta, { ctrlKey: true });
+    expect(beta.closest('[data-asset-card]')?.getAttribute('data-selected')).toBe('true');
+    expect(alpha.closest('[data-asset-card]')?.getAttribute('data-active')).toBe('true');
+  });
+
+  it('uses a stable field table for list view and an intake-history landmark for timeline', async () => {
+    render(<LibrarySection active onOpenProject={() => {}} />);
+    await screen.findAllByText('A photo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(screen.getByRole('table', { name: 'Resource directory' })).toBeTruthy();
+    for (const heading of ['Name', 'Type', 'Source', 'Captured', 'Size']) {
+      expect(screen.getByRole('columnheader', { name: heading })).toBeTruthy();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
+    expect(screen.getByRole('feed', { name: 'Intake history' })).toBeTruthy();
   });
 
   it('wires result count, stable sorting, and removable filter facets into the workbench', async () => {

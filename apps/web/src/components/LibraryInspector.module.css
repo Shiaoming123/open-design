@@ -112,6 +112,52 @@
   min-height: 360px;
 }
 
+.selectionSummary {
+  display: flex;
+  min-height: 360px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px;
+  color: var(--text-muted);
+}
+
+.selectionSummary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selectionSummary strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.selectionSummary span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.selectionSummary dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.selectionSummary dl div {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.selectionSummary dt,
+.selectionSummary dd {
+  margin: 0;
+  font-size: 12px;
+}
+
 .fontPreview span {
   color: var(--text);
   font-size: 88px;

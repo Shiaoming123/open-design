@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import type { LibraryAsset, LibraryAssetMetadataPatch, LibraryCollection } from '@open-design/contracts';
 import { Button, Input, Textarea } from '@open-design/components';
 
-import { libraryAssetRawUrl } from '../providers/registry';
 import { Icon } from './Icon';
 import {
   assetTitle,
@@ -14,9 +13,11 @@ import {
 } from './LibraryAssetMeta';
 import styles from './LibraryInspector.module.css';
 import { useT } from '../i18n';
+import { LibraryPreviewStage } from './LibraryPreviewStage';
 
 interface Props {
   asset: LibraryAsset | null;
+  selection?: LibraryAsset[];
   hasPrev: boolean;
   hasNext: boolean;
   onPrev: () => void;
@@ -33,89 +34,11 @@ function hasLocalPreview(asset: LibraryAsset): boolean {
   return asset.storage === 'owned';
 }
 
-function HtmlPreviewStage({ asset }: { asset: LibraryAsset }) {
-  const [visible, setVisible] = useState(asset);
-  const [pending, setPending] = useState<LibraryAsset | null>(null);
-  useEffect(() => {
-    if (asset.id !== visible.id) setPending(asset);
-  }, [asset, visible.id]);
-
-  return (
-    <>
-      <iframe
-        key={visible.id}
-        className={styles.frame}
-        src={libraryAssetRawUrl(visible.id)}
-        sandbox="allow-scripts"
-        title={assetTitle(visible)}
-      />
-      {pending ? (
-        <iframe
-          key={pending.id}
-          className={`${styles.frame} ${styles.framePending}`}
-          src={libraryAssetRawUrl(pending.id)}
-          sandbox="allow-scripts"
-          title={assetTitle(pending)}
-          aria-hidden="true"
-          onLoad={() => {
-            setVisible(pending);
-            setPending(null);
-          }}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function PreviewStage({ asset }: { asset: LibraryAsset }) {
-  const t = useT();
-  const title = assetTitle(asset);
-  const rawUrl = libraryAssetRawUrl(asset.id);
-
-  if (!hasLocalPreview(asset)) {
-    return (
-      <div className={styles.unavailable}>
-        <Icon name="eye-off" size={22} />
-        <strong>{t('resources.previewMissing')}</strong>
-        <span>{t('resources.previewMissingDetail')}</span>
-      </div>
-    );
-  }
-
-  switch (asset.kind) {
-    case 'image':
-      return <img className={styles.media} src={rawUrl} alt={title} />;
-    case 'video':
-      return <video className={styles.media} src={rawUrl} controls preload="metadata" playsInline />;
-    case 'html':
-    case 'design-system':
-      return <HtmlPreviewStage asset={asset} />;
-    case 'font':
-      return (
-        <div className={styles.fontPreview}>
-          <style>{`@font-face{font-family:"od-inspector-${asset.id}";src:url("${rawUrl}");font-display:swap;}`}</style>
-          <span style={{ fontFamily: `"od-inspector-${asset.id}", sans-serif` }}>Ag</span>
-          <small>The quick brown fox jumps over the lazy dog.</small>
-        </div>
-      );
-    case 'color': {
-      const color = asset.palette?.[0];
-      return color ? <div className={styles.color} style={{ background: color }} aria-label={color} /> : null;
-    }
-    default:
-      return (
-        <div className={styles.unavailable}>
-          <Icon name="file-text" size={22} />
-          <strong>{kindLabel(badgeKind(asset))}</strong>
-          <span>{t('resources.inspectFullscreen')}</span>
-        </div>
-      );
-  }
-}
 
 /** Persistent, selection-driven preview and metadata pane. */
 export function LibraryInspector({
   asset,
+  selection = [],
   hasPrev,
   hasNext,
   onPrev,
@@ -134,6 +57,28 @@ export function LibraryInspector({
     setDisplayName(asset?.displayName ?? '');
     setNote(asset?.note ?? '');
   }, [asset?.id, asset?.displayName, asset?.note]);
+
+  if (selection.length > 1) {
+    const counts = new Map<string, number>();
+    for (const selected of selection) {
+      const label = kindLabel(badgeKind(selected));
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return (
+      <div className={styles.selectionSummary}>
+        <Icon name="layers-filled" size={24} />
+        <div>
+          <strong>{selection.length} resources selected</strong>
+          <span>Batch actions apply to this selection. Preview remains tied to the active resource.</span>
+        </div>
+        <dl>
+          {[...counts].map(([label, count]) => (
+            <div key={label}><dt>{label}</dt><dd>{count}</dd></div>
+          ))}
+        </dl>
+      </div>
+    );
+  }
 
   if (!asset) {
     return (
@@ -176,7 +121,7 @@ export function LibraryInspector({
       </header>
 
       <div className={styles.stage}>
-        <PreviewStage asset={asset} />
+        <LibraryPreviewStage asset={asset} />
         <div className={styles.navigation}>
           <Button variant="ghost" size="icon" aria-label={t('resources.previous')} disabled={!hasPrev} onClick={onPrev}>
             <Icon name="chevron-left" size={17} />

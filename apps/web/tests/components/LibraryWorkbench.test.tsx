@@ -7,6 +7,7 @@ import type { LibraryAsset } from '@open-design/contracts';
 import { LibraryInspector } from '../../src/components/LibraryInspector';
 import { LibraryWorkbenchLayout } from '../../src/components/LibraryWorkbenchLayout';
 import { LibraryResourceSidebar } from '../../src/components/LibraryResourceSidebar';
+import { LibraryPreviewStage } from '../../src/components/LibraryPreviewStage';
 
 function makeAsset(over: Partial<LibraryAsset> = {}): LibraryAsset {
   const now = 1_700_000_000_000;
@@ -83,6 +84,13 @@ describe('Resources workbench', () => {
     expect(document.querySelector('iframe')).toBeNull();
   });
 
+  it('uses one reusable preview stage for local HTML without granting same-origin access', () => {
+    render(<LibraryPreviewStage asset={makeAsset({ kind: 'html' })} />);
+    const frame = screen.getByTitle('Reference image');
+    expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
+    expect(document.querySelectorAll('iframe')).toHaveLength(1);
+  });
+
   it('provides adjacent navigation and fullscreen preview for a local asset', () => {
     const onNext = vi.fn();
     const onOpenFullscreen = vi.fn();
@@ -103,6 +111,29 @@ describe('Resources workbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open fullscreen preview' }));
     expect(onNext).toHaveBeenCalledOnce();
     expect(onOpenFullscreen).toHaveBeenCalledOnce();
+  });
+
+  it('shows a selection summary instead of previewing an arbitrary selected asset', () => {
+    render(
+      <LibraryInspector
+        asset={makeAsset()}
+        selection={[
+          makeAsset({ id: 'asset-1', kind: 'image' }),
+          makeAsset({ id: 'asset-2', kind: 'html', sourceTitle: 'Captured page' }),
+        ]}
+        hasPrev={false}
+        hasNext={false}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onOpenFullscreen={vi.fn()}
+        onOpenProject={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('2 resources selected')).toBeTruthy();
+    expect(screen.getByText('Image')).toBeTruthy();
+    expect(screen.getByText('HTML')).toBeTruthy();
+    expect(document.querySelector('iframe')).toBeNull();
   });
 
   it('edits metadata, favorite state, and flat collection membership from the inspector', () => {

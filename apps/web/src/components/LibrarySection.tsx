@@ -53,6 +53,8 @@ import {
   assetTitle,
   badgeKind,
   fontFamilyFor,
+  formatBytes,
+  formatDate,
   kindLabel,
   kindTint,
   matchesKindFilter,
@@ -356,6 +358,7 @@ interface LibraryCardProps {
   /** Flat position in `assets` — drives shift-range + box selection. */
   index: number;
   selected: boolean;
+  active: boolean;
   /** This card's asset is mid "Edit as page" (spinner gate). */
   editing: boolean;
   onToggle: (id: string, index: number) => void;
@@ -376,6 +379,7 @@ const LibraryCard = memo(function LibraryCard({
   asset,
   index,
   selected,
+  active,
   editing,
   onToggle,
   onRange,
@@ -394,6 +398,7 @@ const LibraryCard = memo(function LibraryCard({
       data-asset-card
       data-asset-id={asset.id}
       data-selected={selected ? 'true' : 'false'}
+      data-active={active ? 'true' : 'false'}
     >
       <div className={styles.thumb}>
         <LibraryThumb asset={asset} />
@@ -530,7 +535,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   // query keys off `debouncedSearch`, so a fast typist fires one request, not
   // one per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [activeAssetId, setActiveAssetId] = useState<string | null>(null);
   const [fullscreenPreviewOpen, setFullscreenPreviewOpen] = useState(false);
   const [band, setBand] = useState<Band | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -726,7 +731,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       try {
         const result = await editLibraryAssetAsPage(assetId);
         if (result) {
-          setPreviewId(null);
+          setActiveAssetId(null);
           onOpenProject(result.projectId, result.relPath);
         }
       } finally {
@@ -744,7 +749,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     if (!deleted.size) return;
     setAssets((prev) => prev.filter((a) => !deleted.has(a.id)));
     setSelectedIds(new Set());
-    setPreviewId((cur) => (cur && deleted.has(cur) ? null : cur));
+    setActiveAssetId((cur) => (cur && deleted.has(cur) ? null : cur));
   }, [selectedIds]);
 
   // Bulk delete is destructive and easy to trigger (a button or Delete/
@@ -1095,9 +1100,9 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     [assets],
   );
 
-  const previewIndex = previewId ? displayAssets.findIndex((a) => a.id === previewId) : -1;
-  const previewAsset = previewIndex >= 0 ? displayAssets[previewIndex] : null;
-  const inspectorAsset = previewAsset ?? displayAssets[0] ?? null;
+  const previewIndex = activeAssetId ? displayAssets.findIndex((a) => a.id === activeAssetId) : -1;
+  const previewAsset = previewIndex >= 0 ? displayAssets[previewIndex] ?? null : null;
+  const inspectorAsset = previewAsset;
   const inspectorIndex = inspectorAsset ? displayAssets.findIndex((a) => a.id === inspectorAsset.id) : -1;
   const selectedCount = selectedIds.size;
   const facets = useMemo<LibraryFacet[]>(() => {
@@ -1147,14 +1152,50 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       asset={asset}
       index={index}
       selected={selectedIds.has(asset.id)}
+      active={activeAssetId === asset.id}
       editing={editingId === asset.id}
       onToggle={toggleOne}
       onRange={rangeTo}
-      onPreview={setPreviewId}
+      onPreview={setActiveAssetId}
       onDelete={onDelete}
       onEditAsPage={handleEditAsPage}
       onOpenProject={onOpenProject}
     />
+  );
+
+  const renderList = () => (
+    <div className={styles.listScroll}>
+      <table className={styles.listTable} aria-label="Resource directory">
+        <thead>
+          <tr><th>Name</th><th>Type</th><th>Source</th><th>Captured</th><th>Size</th><th><span className={styles.srOnly}>Selection</span></th></tr>
+        </thead>
+        <tbody>
+          {displayAssets.map((asset, index) => {
+            const source = primarySource(asset);
+            const title = assetTitle(asset);
+            const selected = selectedIds.has(asset.id);
+            return (
+              <tr key={asset.id} data-active={activeAssetId === asset.id ? 'true' : 'false'} data-selected={selected ? 'true' : 'false'}>
+                <td><button type="button" className={styles.listTitle} onClick={() => setActiveAssetId(asset.id)}>{title}</button></td>
+                <td>{kindLabel(badgeKind(asset))}</td>
+                <td>{source ? SOURCE_LABELS[source] : '—'}</td>
+                <td>{formatDate(asset.capturedAt)}</td>
+                <td>{formatBytes(asset.size) || '—'}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={styles.listSelect}
+                    aria-label={selected ? `Deselect ${title}` : `Select ${title}`}
+                    aria-pressed={selected}
+                    onClick={(event) => event.shiftKey ? rangeTo(index) : toggleOne(asset.id, index)}
+                  >{selected ? '✓' : '+'}</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 
   return (
@@ -1214,19 +1255,20 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         inspector={
           <LibraryInspector
             asset={inspectorAsset}
+            selection={displayAssets.filter((asset) => selectedIds.has(asset.id))}
             hasPrev={inspectorIndex > 0}
             hasNext={inspectorIndex >= 0 && inspectorIndex < displayAssets.length - 1}
             onPrev={() => {
               const prev = displayAssets[inspectorIndex - 1];
-              if (prev) setPreviewId(prev.id);
+              if (prev) setActiveAssetId(prev.id);
             }}
             onNext={() => {
               const next = displayAssets[inspectorIndex + 1];
-              if (next) setPreviewId(next.id);
+              if (next) setActiveAssetId(next.id);
             }}
             onOpenFullscreen={() => {
               if (inspectorAsset?.storage === 'owned') {
-                setPreviewId(inspectorAsset.id);
+                setActiveAssetId(inspectorAsset.id);
                 setFullscreenPreviewOpen(true);
               }
             }}
@@ -1499,9 +1541,11 @@ export function LibrarySection({ active, onOpenProject }: Props) {
             lands here.
           </p>
         </div>
-      ) : viewMode === 'timeline' ? (
+      ) : viewMode === 'list' ? renderList() : viewMode === 'timeline' ? (
         <div
           className={styles.timeline}
+          role="feed"
+          aria-label="Intake history"
           ref={gridRef}
           onMouseDown={onGridMouseDown}
           data-selecting={selectedCount > 0 ? 'true' : 'false'}
@@ -1593,16 +1637,16 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           hasNext={previewIndex >= 0 && previewIndex < displayAssets.length - 1}
           onPrev={() => {
             const prev = displayAssets[previewIndex - 1];
-            if (prev) setPreviewId(prev.id);
+            if (prev) setActiveAssetId(prev.id);
           }}
           onNext={() => {
             const next = displayAssets[previewIndex + 1];
-            if (next) setPreviewId(next.id);
+            if (next) setActiveAssetId(next.id);
           }}
           onClose={() => setFullscreenPreviewOpen(false)}
           onDelete={(id) => {
             void onDelete(id);
-            setPreviewId(null);
+            setActiveAssetId(null);
           }}
           onOpenProject={onOpenProject}
           onEditAsPage={handleEditAsPage}

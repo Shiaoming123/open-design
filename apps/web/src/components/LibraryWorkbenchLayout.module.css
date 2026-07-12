@@ -1,7 +1,8 @@
 .root {
   display: grid;
   grid-template-columns: minmax(164px, 208px) minmax(420px, 1fr) minmax(280px, 340px);
-  min-height: min(760px, calc(100vh - 150px));
+  height: min(760px, calc(100vh - 150px));
+  min-height: 520px;
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
@@ -17,6 +18,8 @@
 .sidebar,
 .inspector {
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
   background: color-mix(in srgb, var(--bg-panel) 92%, var(--bg-subtle));
 }
 
@@ -26,6 +29,7 @@
 
 .results {
   min-width: 0;
+  min-height: 0;
   padding: 0 18px 18px;
   overflow: auto;
 }

@@ -30,9 +30,7 @@ import {
   SOURCE_LABELS,
   assetTitle,
   badgeKind,
-  colorOf,
   elementMetaOf,
-  fontFamilyFor,
   formatBytes,
   formatDate,
   kindLabel,
@@ -41,6 +39,7 @@ import {
   primarySource,
 } from './LibraryAssetMeta';
 import styles from './LibraryPreviewModal.module.css';
+import { LibraryPreviewStage } from './LibraryPreviewStage';
 
 interface Props {
   asset: LibraryAsset;
@@ -79,97 +78,6 @@ function useRawText(rawUrl: string, enabled: boolean) {
     };
   }, [rawUrl, enabled]);
   return state;
-}
-
-function FontSpecimen({ asset, rawUrl }: { asset: LibraryAsset; rawUrl: string }) {
-  const family = fontFamilyFor(asset.id);
-  return (
-    <div className={styles.fontStage}>
-      {/* Self-contained @font-face so the specimen works even outside the grid. */}
-      <style>{`@font-face{font-family:"${family}";src:url("${rawUrl}");font-display:swap;}`}</style>
-      <div className={styles.fontSpecimen} style={{ fontFamily: `"${family}", sans-serif` }}>
-        <p className={styles.fontHuge}>Ag</p>
-        <p className={styles.fontRow}>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
-        <p className={styles.fontRow}>abcdefghijklmnopqrstuvwxyz</p>
-        <p className={styles.fontRow}>0123456789 &amp; ! ? @ # $ %</p>
-        <p className={styles.fontPangram}>The quick brown fox jumps over the lazy dog.</p>
-        <p className={styles.fontPangramSm}>The quick brown fox jumps over the lazy dog.</p>
-      </div>
-    </div>
-  );
-}
-
-function ColorStage({ asset, rawUrl }: { asset: LibraryAsset; rawUrl: string }) {
-  const needsText = !asset.palette?.length;
-  const { text, loading } = useRawText(rawUrl, needsText);
-  const value = colorOf(asset, text);
-  if (loading && !value) return <div className={styles.stageNote}>Loading…</div>;
-  if (!value) return <div className={styles.stageNote}>No color value available.</div>;
-  const swatches = asset.palette?.length ? asset.palette : [value];
-  return (
-    <div className={styles.colorStage}>
-      <div className={styles.colorHero} style={{ background: value }} />
-      <div className={styles.colorInfo}>
-        <code className={styles.colorValue}>{value}</code>
-        {swatches.length > 1 ? (
-          <div className={styles.palette}>
-            {swatches.map((c, i) => (
-              <span key={`${c}-${i}`} className={styles.paletteChip} style={{ background: c }} title={c} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function TextStage({ rawUrl }: { rawUrl: string }) {
-  const { text, loading, error } = useRawText(rawUrl, true);
-  if (loading) return <div className={styles.stageNote}>Loading…</div>;
-  if (error) return <div className={styles.stageNote}>Could not load text.</div>;
-  return <pre className={styles.textStage}>{text}</pre>;
-}
-
-function UrlStage({ asset, rawUrl }: { asset: LibraryAsset; rawUrl: string }) {
-  const needsText = !asset.sourceUrl;
-  const { text } = useRawText(rawUrl, needsText);
-  const href = asset.sourceUrl || (text ?? '').trim();
-  if (!href) return <div className={styles.stageNote}>No link available.</div>;
-  return (
-    <div className={styles.urlStage}>
-      <KindIcon kind="url" size={40} className={styles.urlGlyph} />
-      <a className={styles.urlValue} href={href} target="_blank" rel="noreferrer">
-        {href}
-      </a>
-      <a className={styles.urlOpen} href={href} target="_blank" rel="noreferrer">
-        Open in new tab →
-      </a>
-    </div>
-  );
-}
-
-function Stage({ asset }: { asset: LibraryAsset }) {
-  const rawUrl = libraryAssetRawUrl(asset.id);
-  const title = assetTitle(asset);
-  switch (asset.kind) {
-    case 'image':
-      return <img className={styles.stageImage} src={rawUrl} alt={title} />;
-    case 'video':
-      return <video className={styles.stageVideo} src={rawUrl} controls autoPlay loop playsInline />;
-    case 'design-system':
-    case 'html':
-      // Opaque-origin sandbox: scripts/animations run, daemon stays unreachable.
-      return <iframe className={styles.stageFrame} src={rawUrl} sandbox="allow-scripts" title={title} />;
-    case 'font':
-      return <FontSpecimen asset={asset} rawUrl={rawUrl} />;
-    case 'color':
-      return <ColorStage asset={asset} rawUrl={rawUrl} />;
-    case 'url':
-      return <UrlStage asset={asset} rawUrl={rawUrl} />;
-    case 'text':
-    default:
-      return <TextStage rawUrl={rawUrl} />;
-  }
 }
 
 /**
@@ -354,7 +262,7 @@ export function LibraryPreviewModal({
             </button>
           ) : null}
           <div className={styles.stageInner} key={asset.id}>
-            <Stage asset={asset} />
+            <LibraryPreviewStage asset={asset} autoplay />
           </div>
           {hasNext ? (
             <button type="button" className={`${styles.nav} ${styles.navNext}`} onClick={onNext} aria-label="Next asset">
