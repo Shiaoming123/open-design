@@ -262,7 +262,7 @@ export function LibraryPreviewModal({
             </button>
           ) : null}
           <div className={styles.stageInner} key={asset.id}>
-            <LibraryPreviewStage asset={asset} autoplay />
+            <LibraryPreviewStage asset={asset} autoplay variant="full" />
           </div>
           {hasNext ? (
             <button type="button" className={`${styles.nav} ${styles.navNext}`} onClick={onNext} aria-label="Next asset">

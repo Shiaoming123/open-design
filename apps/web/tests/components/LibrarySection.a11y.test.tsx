@@ -10,13 +10,17 @@ vi.mock('../../src/components/plugins-home/useInView', () => ({
 
 const fetchLibraryAssets = vi.fn(async (): Promise<LibraryAsset[]> => []);
 const fetchLibraryAsset = vi.fn(async (): Promise<LibraryAsset | null> => null);
+const { deleteLibraryAsset, editLibraryAssetAsPage } = vi.hoisted(() => ({
+  deleteLibraryAsset: vi.fn(async () => true),
+  editLibraryAssetAsPage: vi.fn(),
+}));
 vi.mock('../../src/providers/registry', () => ({
   fetchLibraryAssets: (...args: unknown[]) => fetchLibraryAssets(...(args as [])),
   fetchLibraryAsset: (...args: unknown[]) => fetchLibraryAsset(...(args as [])),
   libraryAssetRawUrl: (id: string) => `/raw/${id}`,
   applyLibraryAsset: vi.fn(),
-  deleteLibraryAsset: vi.fn(),
-  editLibraryAssetAsPage: vi.fn(),
+  deleteLibraryAsset,
+  editLibraryAssetAsPage,
   fetchDesignSystem: vi.fn(),
   fetchDesignSystems: vi.fn(async () => []),
   fetchLibraryAssetAsFile: vi.fn(),
@@ -113,6 +117,42 @@ describe('LibrarySection accessibility', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
     expect(screen.getByRole('feed', { name: 'Intake history' })).toBeTruthy();
+  });
+
+  it('keeps direct resource actions available in list view', async () => {
+    const onOpenProject = vi.fn();
+    fetchLibraryAssets.mockResolvedValue([
+      makeAsset({ id: 'project', sourceTitle: 'Project asset', originProjectId: 'project-1', relPath: 'cover.png' }),
+      makeAsset({ id: 'page', kind: 'html', sourceTitle: 'Captured page', sourceUrl: 'https://example.com/page' }),
+    ]);
+    render(<LibrarySection active onOpenProject={onOpenProject} />);
+    await screen.findByText('2 resources');
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open project for Project asset' }));
+    expect(onOpenProject).toHaveBeenCalledWith('project-1', 'cover.png');
+    expect(screen.getByRole('link', { name: 'Source for Captured page' }).getAttribute('href')).toBe('https://example.com/page');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Captured page as page' }));
+    expect(editLibraryAssetAsPage).toHaveBeenCalledWith('page');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Project asset' }));
+    expect(deleteLibraryAsset).toHaveBeenCalledWith('project');
+  });
+
+  it('clears batch selection when filters change so the bar and inspector cannot drift', async () => {
+    fetchLibraryAssets.mockResolvedValue([
+      makeAsset({ id: 'alpha', sourceTitle: 'Alpha' }),
+      makeAsset({ id: 'beta', sourceTitle: 'Beta' }),
+    ]);
+    render(<LibrarySection active onOpenProject={() => {}} />);
+    const checks = await screen.findAllByRole('button', { name: 'Select asset' });
+    fireEvent.click(checks[0]!);
+    fireEvent.click(checks[1]!);
+    expect(screen.getByText('2 selected')).toBeTruthy();
+    expect(screen.getByText('2 resources selected')).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by kind' }), { target: { value: 'image' } });
+    await waitFor(() => expect(screen.queryByText('2 selected')).toBeNull());
+    expect(screen.queryByText('2 resources selected')).toBeNull();
   });
 
   it('wires result count, stable sorting, and removable filter facets into the workbench', async () => {

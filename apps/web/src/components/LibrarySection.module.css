@@ -194,6 +194,9 @@
 .listTitle { max-width: 42ch; overflow: hidden; text-overflow: ellipsis; font-weight: 600; text-align: left; }
 .listSelect { width: 28px; height: 28px; border-radius: 6px; }
 .listSelect[aria-pressed='true'] { background: var(--selected); color: #fff; }
+.listActions { display: flex; align-items: center; gap: 8px; }
+.listActions button, .listActions a { border: 0; padding: 0; background: none; color: var(--accent); font: inherit; text-decoration: none; cursor: pointer; }
+.listActions button:last-child { color: var(--text-soft); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 
 /* --- timeline view ------------------------------------------------------ */

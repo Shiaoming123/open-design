@@ -10,6 +10,7 @@
 //     real <img>/<iframe> thumbnail mounts once a card is in view.
 
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryAsset } from '@open-design/contracts';
 
@@ -228,5 +229,27 @@ describe('LibrarySection lazy-mount contract', () => {
       expect(img).not.toBeNull();
       expect(img?.getAttribute('data-loaded')).toBe('false');
     });
+  });
+
+  it.each([500, 2_000])('keeps %i off-screen resources lightweight within the render budget', async (count) => {
+    fetchLibraryAssets.mockResolvedValue(
+      Array.from({ length: count }, (_, index) => makeAsset({ id: `bulk-${count}-${index}`, sourceTitle: `Bulk ${index}` })),
+    );
+    const started = performance.now();
+    const view = render(<LibrarySection active onOpenProject={() => {}} />);
+    await screen.findByText(`Bulk ${count - 1}`);
+    expect(document.querySelectorAll('[data-asset-card]')).toHaveLength(count);
+    expect(screen.getByRole('region', { name: 'Resource results' }).querySelector('img, iframe, video')).toBeNull();
+    expect(performance.now() - started).toBeLessThan(count === 500 ? 4_000 : 10_000);
+    view.unmount();
+  });
+
+  it('keeps the three-pane, touch-selection, and wrapping batch-bar CSS contracts', () => {
+    const layoutCss = readFileSync(`${process.cwd()}/src/components/LibraryWorkbenchLayout.module.css`, 'utf8');
+    const sectionCss = readFileSync(`${process.cwd()}/src/components/LibrarySection.module.css`, 'utf8');
+    expect(layoutCss).toMatch(/\.sidebar,[\s\S]*?\.inspector[\s\S]*?overflow:\s*auto/);
+    expect(layoutCss).toMatch(/\.results[\s\S]*?overflow:\s*auto/);
+    expect(sectionCss).toMatch(/@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.selectCheck\s*\{\s*opacity:\s*1/);
+    expect(sectionCss).toMatch(/\.selectionBar\s*\{[\s\S]*?flex-wrap:\s*wrap/);
   });
 });

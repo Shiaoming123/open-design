@@ -568,6 +568,14 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   const { selectedIds, setSelectedIds, toggleOne, rangeTo, selectAll, clearSelection } =
     useLibrarySelection(displayAssets);
 
+  // A selection belongs to the result set in which it was made. Clearing it
+  // when the server-backed filters change keeps batch actions, the count, and
+  // the Inspector summary aligned instead of retaining invisible asset ids.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setActiveAssetId(null);
+  }, [collectionId, debouncedSearch, kind, resourceView, setSelectedIds, source]);
+
   // Debounce the search box before it touches the network (250ms trailing).
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250);
@@ -1167,13 +1175,15 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     <div className={styles.listScroll}>
       <table className={styles.listTable} aria-label="Resource directory">
         <thead>
-          <tr><th>Name</th><th>Type</th><th>Source</th><th>Captured</th><th>Size</th><th><span className={styles.srOnly}>Selection</span></th></tr>
+          <tr><th>Name</th><th>Type</th><th>Source</th><th>Captured</th><th>Size</th><th>Actions</th><th><span className={styles.srOnly}>Selection</span></th></tr>
         </thead>
         <tbody>
           {displayAssets.map((asset, index) => {
             const source = primarySource(asset);
             const title = assetTitle(asset);
             const selected = selectedIds.has(asset.id);
+            const projectId = originProjectId(asset);
+            const designSystemId = originDesignSystemId(asset);
             return (
               <tr key={asset.id} data-active={activeAssetId === asset.id ? 'true' : 'false'} data-selected={selected ? 'true' : 'false'}>
                 <td><button type="button" className={styles.listTitle} onClick={() => setActiveAssetId(asset.id)}>{title}</button></td>
@@ -1181,6 +1191,14 @@ export function LibrarySection({ active, onOpenProject }: Props) {
                 <td>{source ? SOURCE_LABELS[source] : '—'}</td>
                 <td>{formatDate(asset.capturedAt)}</td>
                 <td>{formatBytes(asset.size) || '—'}</td>
+                <td><div className={styles.listActions}>
+                  {designSystemId ? <button type="button" onClick={() => navigate({ kind: 'design-system-detail', designSystemId })} aria-label={`Open design system for ${title}`}>Design system</button>
+                    : projectId ? <button type="button" onClick={() => onOpenProject(projectId, asset.relPath)} aria-label={`Open project for ${title}`}>Project</button>
+                    : asset.kind === 'html' ? <button type="button" onClick={() => handleEditAsPage(asset.id)} disabled={editingId === asset.id} aria-label={`Edit ${title} as page`}>Edit page</button>
+                    : null}
+                  {asset.sourceUrl ? <a href={asset.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Source for ${title}`}>Source</a> : null}
+                  <button type="button" onClick={() => void onDelete(asset.id)} aria-label={`Remove ${title}`}>Remove</button>
+                </div></td>
                 <td>
                   <button
                     type="button"

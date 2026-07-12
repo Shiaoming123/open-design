@@ -7,3 +7,13 @@
 .color { display: flex; min-height: 260px; align-items: flex-end; padding: 18px; }
 .color code { padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,.86); color: #111; }
 .text { width: 100%; min-height: 260px; margin: 0; padding: 20px; overflow: auto; white-space: pre-wrap; color: var(--text); background: var(--bg-subtle); }
+.fontFull { width: 100%; padding: clamp(24px, 5vw, 64px); overflow: auto; color: var(--text); background: var(--bg-panel); }
+.fontFull p { margin: 8px 0; font-size: clamp(18px, 2vw, 28px); overflow-wrap: anywhere; }
+.fontFull .fontHero { margin: 0 0 20px; font-size: clamp(88px, 14vw, 180px); line-height: .8; }
+.fontFull .fontPangram { margin-top: 24px; font-size: clamp(30px, 4vw, 58px); line-height: 1.1; }
+.colorFull { display: grid; width: 100%; min-height: 360px; align-content: end; gap: 12px; padding: 20px; }
+.colorFull code, .color code { width: max-content; padding: 5px 8px; border-radius: 6px; background: rgba(255,255,255,.88); color: #111; }
+.palette { display: flex; gap: 8px; padding: 8px; border-radius: 10px; background: rgba(255,255,255,.88); }
+.palette span { width: 34px; height: 34px; border: 1px solid rgba(0,0,0,.12); border-radius: 7px; }
+.url { display: flex; min-height: 300px; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px; text-align: center; }
+.url a { max-width: 100%; color: var(--accent); overflow-wrap: anywhere; }

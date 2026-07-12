@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryAsset } from '@open-design/contracts';
 
@@ -89,6 +89,31 @@ describe('Resources workbench', () => {
     const frame = screen.getByTitle('Reference image');
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
     expect(document.querySelectorAll('iframe')).toHaveLength(1);
+  });
+
+  it('preserves the full color palette and raw-body fallbacks in the shared preview stage', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('https://example.com/raw-body'));
+    const { rerender } = render(
+      <LibraryPreviewStage
+        asset={makeAsset({ kind: 'color', palette: ['#112233', '#445566', '#778899'] })}
+        variant="full"
+      />,
+    );
+    expect(screen.getByText('#112233')).toBeTruthy();
+    expect(screen.getByTitle('#445566')).toBeTruthy();
+    expect(screen.getByTitle('#778899')).toBeTruthy();
+
+    rerender(<LibraryPreviewStage asset={makeAsset({ kind: 'url', sourceUrl: undefined })} variant="full" />);
+    expect(await screen.findByRole('link', { name: 'https://example.com/raw-body' })).toBeTruthy();
+    fetchMock.mockRestore();
+  });
+
+  it('preserves the complete font specimen in full preview mode', () => {
+    render(<LibraryPreviewStage asset={makeAsset({ kind: 'font' })} variant="full" />);
+    expect(screen.getByText('ABCDEFGHIJKLMNOPQRSTUVWXYZ')).toBeTruthy();
+    expect(screen.getByText('abcdefghijklmnopqrstuvwxyz')).toBeTruthy();
+    expect(screen.getByText('0123456789 & ! ? @ # $ %')).toBeTruthy();
+    expect(screen.getAllByText('The quick brown fox jumps over the lazy dog.')).toHaveLength(2);
   });
 
   it('provides adjacent navigation and fullscreen preview for a local asset', () => {
