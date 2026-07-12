@@ -28,8 +28,29 @@ export interface CuratedReferenceSearchResponse {
   total: number;
 }
 
+export interface CuratedReferenceDetail {
+  id: string;
+  kind: string;
+  libraryId: string;
+  status: CuratedReferenceStatus;
+  title: string;
+  summary: string;
+  tags: string[];
+  useCases: string[];
+  userWords: string[];
+  visualTraits: string[];
+  roles: string[];
+  sourcePolicy?: string;
+  captureDepth?: string;
+  sourcePath?: string;
+  previewPath?: string;
+  sourceUrls: string[];
+  sourceUrlHashes: string[];
+  files: Record<string, string>;
+}
+
 export interface CuratedReferenceDetailResponse {
-  reference: CuratedReferenceHit;
+  reference: CuratedReferenceDetail;
 }
 
 export interface CuratedReferenceProfile {

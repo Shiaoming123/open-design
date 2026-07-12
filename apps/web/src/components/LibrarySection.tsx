@@ -125,6 +125,13 @@ function dayKeyOf(asset: LibraryAsset): string {
   return asset.archivedDate || ymdLocal(new Date(asset.capturedAt));
 }
 
+function sortTimelineAssets(assets: LibraryAsset[]): LibraryAsset[] {
+  return [...assets].sort((left, right) => {
+    const archiveOrder = dayKeyOf(right).localeCompare(dayKeyOf(left));
+    return archiveOrder || right.capturedAt - left.capturedAt || left.id.localeCompare(right.id);
+  });
+}
+
 /** Human heading for a `YYYY-MM-DD` day bucket — Today / Yesterday / a date. */
 function dayHeading(key: string): string {
   const today = ymdLocal(new Date());
@@ -570,9 +577,11 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     rects: CardRect[];
   } | null>(null);
   const displayAssets = useMemo(() => sortLibraryAssets(assets, sort), [assets, sort]);
-  const windowAssets = useMemo(() => displayAssets.slice(0, visibleLimit), [displayAssets, visibleLimit]);
+  const timelineAssets = useMemo(() => sortTimelineAssets(assets), [assets]);
+  const orderedAssets = viewMode === 'timeline' ? timelineAssets : displayAssets;
+  const windowAssets = useMemo(() => orderedAssets.slice(0, visibleLimit), [orderedAssets, visibleLimit]);
   const { selectedIds, setSelectedIds, toggleOne, rangeTo, selectAll, clearSelection } =
-    useLibrarySelection(displayAssets);
+    useLibrarySelection(orderedAssets);
 
   // A selection belongs to the result set in which it was made. Clearing it
   // when the server-backed filters change keeps batch actions, the count, and
@@ -1146,9 +1155,8 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     return next;
   }, [collectionId, collections, debouncedSearch, kind, resourceView, source, t]);
 
-  // Day-bucketed groups for the timeline view. Map insertion follows the
-  // selected stable sort, and items keep their flat index in `displayAssets` so
-  // range/box selection stays consistent across every view.
+  // Day-bucketed groups for the timeline view. `windowAssets` uses the fixed
+  // reverse archive/capture order in this view, independently of Grid/List sort.
   const timelineGroups = useMemo(() => {
     const map = new Map<string, Array<{ asset: LibraryAsset; index: number }>>();
     windowAssets.forEach((asset, index) => {

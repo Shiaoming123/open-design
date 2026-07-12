@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   CuratedReferenceDetailResponse,
+  CuratedReferenceDetail,
   CuratedReferenceHit,
   CuratedReferenceRecommendRequest,
   CuratedReferenceRecommendResponse,
@@ -25,15 +26,45 @@ interface CatalogRecord {
   previewPath?: string;
 }
 
+interface CatalogAsset extends CatalogRecord {
+  summary: string;
+  tags: string[];
+  useCases: string[];
+  userWords: string[];
+  visualTraits: string[];
+  roles: string[];
+  sourcePolicy?: string;
+  captureDepth?: string;
+  sourceUrls: string[];
+  sourceUrlHashes: string[];
+  files: Record<string, string>;
+}
+
+type RankingField = 'title' | 'roles' | 'useCases' | 'tags' | 'visualTraits' | 'summary' | 'userWords' | 'libraryId';
+interface RankingProfile {
+  schemaVersion: 'od-reference-ranking/v1';
+  matchMode: 'all-concepts';
+  tokenization: 'unicode-alphanumeric';
+  weights: Record<RankingField, number>;
+  conceptGroups: string[][];
+}
+
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 20;
-const FIELD_WEIGHTS: Array<[keyof CatalogRecord, number]> = [
-  ['title', 12], ['tags', 8], ['useCases', 7], ['userWords', 5],
-  ['visualTraits', 4], ['roles', 3], ['summary', 2], ['libraryId', 2],
+const RANKING_FIELDS: RankingField[] = ['title', 'roles', 'useCases', 'tags', 'visualTraits', 'summary', 'userWords', 'libraryId'];
+const V1_WEIGHTS: Record<RankingField, number> = {
+  title: 10, roles: 6, useCases: 5, tags: 4, visualTraits: 3, summary: 2, userWords: 2, libraryId: 1,
+};
+const V1_CONCEPT_GROUPS = [
+  ['仪表盘', 'dashboard', 'metrics'], ['控制台', 'console'], ['海报', 'poster'],
+  ['编辑', 'editorial', 'magazine'], ['发布', 'launch', 'campaign', 'marketing'],
+  ['动效', 'motion', 'animation'], ['交互', 'interaction'], ['博客', 'blog', 'digital garden'],
+  ['应用', 'app', 'application'], ['设计系统', 'design-system', 'tokens'], ['模板', 'template'],
+  ['数据可视化', 'data-visualization', 'chart'], ['移动端', 'mobile'],
 ];
-const ALIASES: Record<string, string[]> = {
-  海报: ['poster'], 编辑: ['editorial'], 杂志: ['magazine'], 动效: ['motion'],
-  活动: ['campaign'], 产品: ['product'], 博客: ['blog'], 数据: ['data'], 图表: ['chart'],
+const DEFAULT_RANKING: RankingProfile = {
+  schemaVersion: 'od-reference-ranking/v1', matchMode: 'all-concepts', tokenization: 'unicode-alphanumeric',
+  weights: V1_WEIGHTS, conceptGroups: V1_CONCEPT_GROUPS,
 };
 
 export class ReferenceCatalogUnavailableError extends Error {
@@ -70,14 +101,71 @@ function normalizeRecord(value: unknown): CatalogRecord | null {
   };
 }
 
-function terms(query: string): string[] {
-  const base = query.toLocaleLowerCase().match(/[\p{L}\p{N}-]+/gu) ?? [];
-  return [...new Set(base.flatMap((term) => [term, ...(ALIASES[term] ?? [])]))];
+function normalizeFiles(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const entries = Object.entries(value);
+  if (entries.some(([, file]) => typeof file !== 'string' || !safeCatalogPath(file))) return null;
+  return Object.fromEntries(entries) as Record<string, string>;
+}
+
+function normalizeAsset(value: unknown): CatalogAsset | null {
+  const record = normalizeRecord(value);
+  if (!record || !value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const item = value as Record<string, unknown>;
+  const files = normalizeFiles(item.files);
+  if (files === null) return null;
+  return {
+    ...record,
+    summary: record.summary ?? '', tags: record.tags ?? [], useCases: record.useCases ?? [],
+    userWords: record.userWords ?? [], visualTraits: record.visualTraits ?? [], roles: record.roles ?? [],
+    ...(typeof item.sourcePolicy === 'string' ? { sourcePolicy: item.sourcePolicy } : {}),
+    ...(typeof item.captureDepth === 'string' ? { captureDepth: item.captureDepth } : {}),
+    sourceUrls: strings(item.sourceUrls), sourceUrlHashes: strings(item.sourceUrlHashes), files,
+  };
+}
+
+function normalizeRanking(value: unknown): RankingProfile | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  if (input.schemaVersion !== 'od-reference-ranking/v1' || input.matchMode !== 'all-concepts' || input.tokenization !== 'unicode-alphanumeric') return null;
+  if (!input.weights || typeof input.weights !== 'object' || Array.isArray(input.weights)) return null;
+  const weights = input.weights as Record<string, unknown>;
+  if (Object.keys(weights).length !== RANKING_FIELDS.length || RANKING_FIELDS.some((field) => weights[field] !== V1_WEIGHTS[field])) return null;
+  if (!Array.isArray(input.conceptGroups) || !input.conceptGroups.length) return null;
+  const conceptGroups = input.conceptGroups.map((group) => strings(group).map((term) => term.trim().toLocaleLowerCase()).filter(Boolean));
+  if (conceptGroups.some((group, index) => !group.length || group.length !== (input.conceptGroups as unknown[][])[index]?.length)) return null;
+  return { schemaVersion: input.schemaVersion, matchMode: input.matchMode, tokenization: input.tokenization, weights: { ...V1_WEIGHTS }, conceptGroups };
+}
+
+function tokens(value: string): string[] {
+  return value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+function concepts(query: string, ranking: RankingProfile): string[][] {
+  return tokens(query).map((token) => ranking.conceptGroups.find((group) => group.includes(token)) ?? [token]);
+}
+
+function matchesConcept(text: string, concept: string[]): boolean {
+  const haystack = new Set(tokens(text));
+  return concept.some((alternative) => tokens(alternative).every((token) => haystack.has(token)));
 }
 
 function fieldText(record: CatalogRecord, key: keyof CatalogRecord): string {
   const value = record[key];
   return (Array.isArray(value) ? value.join(' ') : String(value ?? '')).toLocaleLowerCase();
+}
+
+function toDetail(asset: CatalogAsset): CuratedReferenceDetail {
+  return {
+    id: asset.id, kind: asset.kind, libraryId: asset.libraryId, status: asset.status, title: asset.title,
+    summary: asset.summary, tags: asset.tags, useCases: asset.useCases, userWords: asset.userWords,
+    visualTraits: asset.visualTraits, roles: asset.roles,
+    ...(asset.sourcePolicy ? { sourcePolicy: asset.sourcePolicy } : {}),
+    ...(asset.captureDepth ? { captureDepth: asset.captureDepth } : {}),
+    ...(asset.sourcePath ? { sourcePath: asset.sourcePath } : {}),
+    ...(asset.previewPath ? { previewPath: asset.previewPath } : {}),
+    sourceUrls: asset.sourceUrls, sourceUrlHashes: asset.sourceUrlHashes, files: asset.files,
+  };
 }
 
 function toHit(record: CatalogRecord, score: number, matchedFields: string[]): CuratedReferenceHit {
@@ -109,41 +197,43 @@ function unavailable(error: string): ReferenceCatalog {
 export async function createReferenceCatalog(catalogDir: string | undefined): Promise<ReferenceCatalog> {
   if (!catalogDir?.trim()) return unavailable('OD_REFERENCE_CATALOG_DIR is not configured');
   const root = path.resolve(catalogDir);
-  let source = '';
-  let records: CatalogRecord[] = [];
-  for (const name of ['search-index.json', 'assets.json']) {
-    try {
-      const parsed = JSON.parse(await readFile(path.join(root, name), 'utf8')) as unknown;
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
-      const container = parsed as Record<string, unknown>;
-      const raw = name === 'search-index.json' ? container.records : container.assets;
-      if (!Array.isArray(raw)) continue;
-      const normalized = raw.map(normalizeRecord).filter((record): record is CatalogRecord => record !== null);
-      if (!normalized.length) continue;
-      source = name;
-      records = normalized;
-      break;
-    } catch {}
-  }
-  if (!source || !records.length) {
-    return unavailable(`invalid reference catalog in ${root}: search-index.json/assets.json contain no valid records`);
-  }
-  const byId = new Map(records.map((record) => [record.id, record]));
+  let assets: CatalogAsset[] = [];
+  try {
+    const parsed = JSON.parse(await readFile(path.join(root, 'assets.json'), 'utf8')) as Record<string, unknown>;
+    if (Array.isArray(parsed.assets)) assets = parsed.assets.map(normalizeAsset).filter((asset): asset is CatalogAsset => asset !== null);
+  } catch {}
+  if (!assets.length) return unavailable(`invalid reference catalog in ${root}: assets.json contains no valid records`);
+  const byId = new Map(assets.map((asset) => [asset.id, asset]));
+
+  let records: CatalogRecord[] = assets;
+  let ranking = DEFAULT_RANKING;
+  try {
+    const parsed = JSON.parse(await readFile(path.join(root, 'search-index.json'), 'utf8')) as Record<string, unknown>;
+    const profile = normalizeRanking(parsed.ranking);
+    const indexed = Array.isArray(parsed.records)
+      ? parsed.records.map(normalizeRecord).filter((record): record is CatalogRecord => record !== null && byId.has(record.id))
+      : [];
+    if (profile && indexed.length) { ranking = profile; records = indexed; }
+  } catch {}
 
   const rank = (request: CuratedReferenceSearchRequest) => {
-    const queryTerms = terms(request.query);
+    const queryConcepts = concepts(request.query, ranking);
     const status = request.status ?? 'accepted';
     const allowedLibraries = request.libraryIds?.length ? new Set(request.libraryIds) : null;
     return records.filter((record) => record.status === status && (!allowedLibraries || allowedLibraries.has(record.libraryId))).map((record) => {
       let score = 0; const matchedFields: string[] = [];
-      for (const [field, weight] of FIELD_WEIGHTS) {
+      for (const field of RANKING_FIELDS) {
+        const weight = ranking.weights[field];
         const text = fieldText(record, field);
-        const matches = queryTerms.filter((term) => text.includes(term)).length;
+        const matches = queryConcepts.filter((concept) => matchesConcept(text, concept)).length;
         if (matches) { score += matches * weight; matchedFields.push(String(field)); }
       }
-      if (request.query.trim() && fieldText(record, 'title').includes(request.query.trim().toLocaleLowerCase())) score += 10;
       return { record, score, matchedFields };
-    }).filter((item) => queryTerms.length === 0 || item.score > 0)
+    }).filter((item) => {
+      if (!queryConcepts.length) return true;
+      const allText = RANKING_FIELDS.map((field) => fieldText(item.record, field)).join(' ');
+      return item.score > 0 && queryConcepts.every((concept) => matchesConcept(allText, concept));
+    })
       .sort((a,b) => b.score - a.score || a.record.id.localeCompare(b.record.id));
   };
 
@@ -156,15 +246,15 @@ export async function createReferenceCatalog(catalogDir: string | undefined): Pr
   return {
     available: true,
     search,
-    get(id) { const record = byId.get(id); return record ? { reference: toHit(record, 0, []) } : null; },
+    get(id) { const asset = byId.get(id); return asset ? { reference: toDetail(asset) } : null; },
     recommend(request) {
       const profile = request.profile;
       const query = [profile.goal, profile.audience, profile.deliverable, ...(profile.styleTraits ?? [])].filter(Boolean).join(' ');
-      const constraintTerms = terms((profile.constraints ?? []).join(' '));
+      const constraintConcepts = concepts((profile.constraints ?? []).join(' '), ranking);
       const candidate = rank({ query }).map(({ record, score, matchedFields }) => {
         const hit = toHit(record, score, matchedFields);
-        const haystack = FIELD_WEIGHTS.map(([field]) => fieldText(record, field)).join(' ');
-        const penalty = constraintTerms.filter((term) => haystack.includes(term)).length * 1_000;
+        const haystack = RANKING_FIELDS.map((field) => fieldText(record, field)).join(' ');
+        const penalty = constraintConcepts.filter((concept) => matchesConcept(haystack, concept)).length * 1_000;
         return penalty ? { ...hit, score: hit.score - penalty } : hit;
       }).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id));
       const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(request.limit ?? DEFAULT_LIMIT)));

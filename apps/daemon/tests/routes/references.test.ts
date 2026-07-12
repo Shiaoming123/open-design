@@ -10,8 +10,9 @@ describe('reference routes', () => {
   let server: http.Server; let baseUrl = '';
   const tokenRegistry = new ToolTokenRegistry();
   const hit = { id:'poster:one', kind:'case-study', libraryId:'poster', status:'accepted', title:'One', snippet:'Grid poster', tags:['poster'], roles:['reference'], score:12, matchedFields:['title'] };
+  const detail = { id:hit.id, kind:hit.kind, libraryId:hit.libraryId, status:hit.status, title:hit.title, summary:hit.snippet, tags:hit.tags, useCases:['launch'], userWords:[], visualTraits:['grid'], roles:hit.roles, captureDepth:'artifact-study', sourceUrls:['https://example.com/poster'], sourceUrlHashes:['0123456789abcdef'], files:{source:'poster/one.json'} };
   const search = (request: {query:string}) => ({ query:request.query, results:[hit], total:1 });
-  const catalog: ReferenceCatalog = { available:true, search, get:(id)=>id===hit.id?{reference:{...hit,score:0,matchedFields:[]}}:null, recommend:(request)=>({profile:request.profile,results:[hit],total:1}) };
+  const catalog: ReferenceCatalog = { available:true, search, get:(id)=>id===hit.id?{reference:detail}:null, recommend:(request)=>({profile:request.profile,results:[hit],total:1}) };
 
   beforeAll(async () => {
     const app=express(); app.use(express.json());
@@ -26,10 +27,10 @@ describe('reference routes', () => {
     expect(searchResponse.status).toBe(200); const body=await searchResponse.json();
     const searchGrant=tokenRegistry.mint({runId:'search-parity',projectId:'p1',allowedEndpoints:['/api/tools/references/search'],allowedOperations:['references:search']});
     expect(await (await fetch(`${baseUrl}/api/tools/references/search`,{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${searchGrant.token}`},body:JSON.stringify({query:'poster'})})).json()).toEqual(body);
-    expect(((await (await fetch(`${baseUrl}/api/references/${encodeURIComponent(hit.id)}`)).json()) as {reference:{id:string}}).reference.id).toBe(hit.id);
+    expect(((await (await fetch(`${baseUrl}/api/references/${encodeURIComponent(hit.id)}`)).json()) as {reference:typeof detail}).reference).toEqual(detail);
     const detailPath=`/api/tools/references/${encodeURIComponent(hit.id)}`;
     const detailGrant=tokenRegistry.mint({runId:'detail-parity',projectId:'p1',allowedEndpoints:[detailPath],allowedOperations:['references:read']});
-    expect(((await (await fetch(`${baseUrl}${detailPath}`,{headers:{authorization:`Bearer ${detailGrant.token}`}})).json()) as {reference:{id:string}}).reference.id).toBe(hit.id);
+    expect(((await (await fetch(`${baseUrl}${detailPath}`,{headers:{authorization:`Bearer ${detailGrant.token}`}})).json()) as {reference:typeof detail}).reference).toEqual(detail);
     const recommend=await fetch(`${baseUrl}/api/references/recommend`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({profile:{goal:'launch poster'}})});
     expect(recommend.status).toBe(200);
   });

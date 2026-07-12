@@ -119,6 +119,24 @@ describe('LibrarySection accessibility', () => {
     expect(screen.getByRole('feed', { name: 'Intake history' })).toBeTruthy();
   });
 
+  it('keeps timeline in reverse archive/capture order regardless of the grid/list sort', async () => {
+    fetchLibraryAssets.mockResolvedValue([
+      makeAsset({ id: 'zeta', sourceTitle: 'Zeta', archivedDate: '2024-01-01', capturedAt: 300 }),
+      makeAsset({ id: 'alpha', sourceTitle: 'Alpha', archivedDate: '2024-01-01', capturedAt: 300 }),
+      makeAsset({ id: 'beta', sourceTitle: 'Beta', archivedDate: '2024-01-02', capturedAt: 100 }),
+    ]);
+    render(<LibrarySection active onOpenProject={() => {}} />);
+    await screen.findByText('3 resources');
+    fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
+
+    const timelineOrder = () => screen.getAllByRole('button', { name: /Preview (Alpha|Beta|Zeta)/ })
+      .map((button) => button.getAttribute('aria-label'));
+    expect(timelineOrder()).toEqual(['Preview Beta', 'Preview Alpha', 'Preview Zeta']);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort resources' }), { target: { value: 'title' } });
+    expect(timelineOrder()).toEqual(['Preview Beta', 'Preview Alpha', 'Preview Zeta']);
+  });
+
   it('keeps direct resource actions available in list view', async () => {
     const onOpenProject = vi.fn();
     fetchLibraryAssets.mockResolvedValue([

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { CuratedReferenceHit } from '@open-design/contracts';
+import type { CuratedReferenceDetail, CuratedReferenceHit } from '@open-design/contracts';
 import { fetchCuratedReference, recommendCuratedReferences, searchCuratedReferences } from '../providers/registry';
 import styles from './CuratedReferencesPanel.module.css';
 
@@ -9,7 +9,7 @@ export function CuratedReferencesPanel() {
   const [results, setResults] = useState<CuratedReferenceHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [detail, setDetail] = useState<CuratedReferenceHit | null>(null);
+  const [detail, setDetail] = useState<CuratedReferenceDetail | null>(null);
 
   const run = async (mode: 'search' | 'recommend') => {
     if (!query.trim()) return;
@@ -88,9 +88,18 @@ export function CuratedReferencesPanel() {
       {detail ? (
         <section className={styles.card} role="region" aria-label="Reference detail">
           <h3>{detail.title}</h3>
-          <p>{detail.snippet}</p>
+          <p>{detail.summary}</p>
+          {detail.captureDepth ? <small>Capture: {detail.captureDepth}</small> : null}
+          {detail.useCases.length ? <small>Use cases: {detail.useCases.join(', ')}</small> : null}
+          {detail.visualTraits.length ? <small>Visual traits: {detail.visualTraits.join(', ')}</small> : null}
           {detail.sourcePath ? <small>{detail.sourcePath}</small> : null}
           {detail.previewPath ? <small>{detail.previewPath}</small> : null}
+          {detail.sourceUrls.map((url) => <small key={url}>{url}</small>)}
+          {Object.entries(detail.files).map(([name, file]) => <small key={name}>{name}: {file}</small>)}
+          <details>
+            <summary>Full metadata</summary>
+            <pre>{JSON.stringify(detail, null, 2)}</pre>
+          </details>
         </section>
       ) : null}
       {!loading && !error && query && results.length === 0

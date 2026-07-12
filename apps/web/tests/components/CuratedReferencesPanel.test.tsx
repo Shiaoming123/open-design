@@ -65,11 +65,19 @@ describe('CuratedReferencesPanel', () => {
 
   it('opens result detail through the shared detail API', async () => {
     searchCuratedReferences.mockResolvedValue({ query: 'poster', total: 1, results: [hit] });
-    fetchCuratedReference.mockResolvedValue({ reference: { ...hit, score: 0, matchedFields: [] } });
+    fetchCuratedReference.mockResolvedValue({ reference: {
+      id: hit.id, kind: hit.kind, libraryId: hit.libraryId, status: hit.status, title: hit.title,
+      summary: hit.snippet, tags: hit.tags, useCases: ['launch'], userWords: [], visualTraits: ['grid'], roles: hit.roles,
+      captureDepth: 'artifact-study', sourcePath: 'poster/one.json', sourceUrls: ['https://example.com/poster'],
+      sourceUrlHashes: ['0123456789abcdef'], files: { source: 'poster/one.json' },
+    } });
     render(<CuratedReferencesPanel />);
     search();
     fireEvent.click(await screen.findByRole('button', { name: 'Details for Swiss Poster' }));
     expect(await screen.findByRole('region', { name: 'Reference detail' })).toHaveTextContent('poster/one.json');
+    expect(screen.getByRole('region', { name: 'Reference detail' })).toHaveTextContent('Capture: artifact-study');
+    expect(screen.getByRole('region', { name: 'Reference detail' })).toHaveTextContent('Use cases: launch');
+    expect(screen.getByText('Full metadata').closest('details')).toHaveTextContent('0123456789abcdef');
     expect(fetchCuratedReference).toHaveBeenCalledWith('poster:one');
   });
 });
