@@ -1,8 +1,8 @@
 .root {
   display: grid;
   grid-template-columns: minmax(164px, 208px) minmax(420px, 1fr) minmax(280px, 340px);
-  height: min(760px, calc(100vh - 150px));
-  min-height: 520px;
+  height: min(760px, var(--library-workbench-height, calc(100dvh - 320px)));
+  min-height: min(520px, var(--library-workbench-height, calc(100dvh - 320px)));
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
@@ -48,6 +48,7 @@
   .root {
     display: flex;
     flex-direction: column;
+    height: auto;
     min-height: 0;
     overflow: visible;
     border: 0;

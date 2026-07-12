@@ -19,6 +19,7 @@ export function LibraryWorkbenchLayout({ sidebar, children, inspector }: Props) 
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const inspectorRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const t = useT();
 
   useEffect(() => {
@@ -31,6 +32,25 @@ export function LibraryWorkbenchLayout({ sidebar, children, inspector }: Props) 
     sync();
     query.addEventListener('change', sync);
     return () => query.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const syncAvailableHeight = () => {
+      const top = root.getBoundingClientRect().top;
+      root.style.setProperty('--library-workbench-height', `${Math.max(320, window.innerHeight - top - 16)}px`);
+    };
+    syncAvailableHeight();
+    const frame = requestAnimationFrame(syncAvailableHeight);
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(syncAvailableHeight) : null;
+    if (root.parentElement) observer?.observe(root.parentElement);
+    window.addEventListener('resize', syncAvailableHeight);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', syncAvailableHeight);
+    };
   }, []);
 
   useEffect(() => {
@@ -75,7 +95,7 @@ export function LibraryWorkbenchLayout({ sidebar, children, inspector }: Props) 
   const filtersOpen = mobilePanel === 'filters';
   const inspectorOpen = mobilePanel === 'inspector';
   return (
-    <div className={styles.root} data-testid="library-workbench">
+    <div ref={rootRef} className={styles.root} data-testid="library-workbench">
       <div className={styles.mobileToolbar}>
         <Button ref={filtersTriggerRef} variant="ghost" aria-expanded={filtersOpen} aria-label={t('resources.showFilters')} onClick={() => setMobilePanel(filtersOpen ? null : 'filters')}>
           <Icon name="sliders" size={15} /> {t('resources.filters')}
