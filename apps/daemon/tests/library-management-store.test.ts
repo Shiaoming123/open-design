@@ -84,6 +84,25 @@ describe('library management persistence', () => {
       'created_at',
       'id',
     ]);
+    const indexColumns = (name: string): string[] =>
+      (db.prepare(`PRAGMA index_info('${name}')`).all() as Array<{ seqno: number; name: string }>)
+        .sort((a, b) => a.seqno - b.seqno)
+        .map((column) => column.name);
+    expect(indexColumns('idx_library_assets_favorite')).toEqual([
+      'favorite',
+      'archived_date',
+      'created_at',
+      'id',
+    ]);
+    expect(indexColumns('idx_library_collection_assets_asset')).toEqual([
+      'asset_id',
+      'collection_id',
+    ]);
+    expect(indexColumns('idx_library_collection_assets_collection')).toEqual([
+      'collection_id',
+      'created_at',
+      'asset_id',
+    ]);
   });
 
   it('returns a stable cursor page when every timestamp is identical', () => {

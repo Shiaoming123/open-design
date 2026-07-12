@@ -54,7 +54,7 @@ import {
   writeFigmaSidecar,
 } from '../library.js';
 import { reconcileLibrary, type ReconcileLibraryResult } from '../library-sync.js';
-import { ensureProjectSubdir } from '../projects.js';
+import { ensureProjectSubdir, validateProjectPath } from '../projects.js';
 import {
   confirmPairing,
   libraryConnectionStatus,
@@ -783,9 +783,28 @@ export function registerLibraryRoutes(app: Express, ctx: RegisterLibraryRoutesDe
     if (!asset) return sendApiError(res, 404, 'NOT_FOUND', 'asset not found');
     const projectId = typeof req.body?.projectId === 'string' ? req.body.projectId : '';
     if (!projectId) return sendApiError(res, 400, 'BAD_REQUEST', 'projectId is required');
+    let targetDir: string | undefined;
+    if (req.body?.dir !== undefined) {
+      if (typeof req.body.dir !== 'string') {
+        return sendApiError(res, 400, 'INVALID_PATH', 'dir must be a project-relative path');
+      }
+      if (req.body.dir.trim()) {
+        try {
+          validateProjectPath(req.body.dir.trim());
+          targetDir = req.body.dir;
+        } catch (error) {
+          return sendApiError(
+            res,
+            400,
+            'INVALID_PATH',
+            error instanceof Error ? error.message : 'invalid project path',
+          );
+        }
+      }
+    }
     try {
       const includeElement = req.body?.includeElement === true;
-      const result = await applyAssetToProject(asset, projectId, 'manual-upload', req.body?.dir, includeElement);
+      const result = await applyAssetToProject(asset, projectId, 'manual-upload', targetDir, includeElement);
       res.json({
         relPath: result.relPath,
         ...(result.elementRelPath ? { elementRelPath: result.elementRelPath } : {}),

@@ -65,7 +65,15 @@ import { LibraryPreviewModal } from './LibraryPreviewModal';
 import { LibraryUploadModal } from './LibraryUploadModal';
 import { LibraryInspector } from './LibraryInspector';
 import { LibraryResourceSidebar } from './LibraryResourceSidebar';
+import {
+  LibraryResultsControls,
+  downloadLibraryAssets,
+  sortLibraryAssets,
+  type LibraryFacet,
+  type LibrarySort,
+} from './LibraryResultsControls';
 import { LibraryWorkbenchLayout } from './LibraryWorkbenchLayout';
+import { useLibrarySelection } from './useLibrarySelection';
 import styles from './LibrarySection.module.css';
 import { useT } from '../i18n';
 
@@ -515,6 +523,8 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   const [batchTag, setBatchTag] = useState('');
   const [batchCollectionId, setBatchCollectionId] = useState('');
   const [mutationError, setMutationError] = useState('');
+  const [sort, setSort] = useState<LibrarySort>('newest');
+  const [exportBusy, setExportBusy] = useState(false);
   const [search, setSearch] = useState('');
   // The input updates `search` instantly (responsive typing) but the server
   // query keys off `debouncedSearch`, so a fast typist fires one request, not
@@ -522,7 +532,6 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [fullscreenPreviewOpen, setFullscreenPreviewOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [band, setBand] = useState<Band | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -542,7 +551,6 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   const fileDragDepth = useRef(0);
   const loadedOnce = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
-  const anchorRef = useRef<number | null>(null);
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -551,6 +559,9 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     moved: boolean;
     rects: CardRect[];
   } | null>(null);
+  const displayAssets = useMemo(() => sortLibraryAssets(assets, sort), [assets, sort]);
+  const { selectedIds, setSelectedIds, toggleOne, rangeTo, selectAll, clearSelection } =
+    useLibrarySelection(displayAssets);
 
   // Debounce the search box before it touches the network (250ms trailing).
   useEffect(() => {
@@ -873,36 +884,6 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     [assets, selectedIds, onOpenProject],
   );
 
-  const toggleOne = useCallback((id: string, index: number) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    anchorRef.current = index;
-  }, []);
-
-  const rangeTo = useCallback(
-    (index: number) => {
-      const anchor = anchorRef.current ?? index;
-      const lo = Math.min(anchor, index);
-      const hi = Math.max(anchor, index);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        for (let i = lo; i <= hi; i++) {
-          const a = assets[i];
-          if (a) next.add(a.id);
-        }
-        return next;
-      });
-    },
-    [assets],
-  );
-
-  const selectAll = useCallback(() => setSelectedIds(new Set(assets.map((a) => a.id))), [assets]);
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
-
   // --- file upload (drop-anywhere + Upload button) -------------------------
   const openUpload = useCallback((files?: File[]) => {
     setSeedFiles(files && files.length ? files : null);
@@ -1079,6 +1060,25 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     }
   }, [load, selectedIds, t]);
 
+  const exportSelected = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setExportBusy(true);
+    setMutationError('');
+    try {
+      const byId = new Map(assets.map((asset) => [asset.id, asset]));
+      const resolved = await Promise.all(ids.map(async (id) => byId.get(id) ?? fetchLibraryAsset(id)));
+      const chosen = resolved.filter((asset): asset is LibraryAsset => asset !== null);
+      const result = await downloadLibraryAssets(chosen);
+      const failed = result.failed + (ids.length - chosen.length);
+      if (failed) setMutationError(t('resources.exportPartial').replace('{count}', String(failed)));
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : t('resources.operationFailed'));
+    } finally {
+      setExportBusy(false);
+    }
+  }, [assets, selectedIds, t]);
+
   // `@font-face` rules for every font asset on screen, so both the grid
   // thumbnails and the preview specimen render in the real typeface.
   const fontFaceCss = useMemo(
@@ -1095,27 +1095,48 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     [assets],
   );
 
-  const previewIndex = previewId ? assets.findIndex((a) => a.id === previewId) : -1;
-  const previewAsset = previewIndex >= 0 ? assets[previewIndex] : null;
-  const inspectorAsset = previewAsset ?? assets[0] ?? null;
-  const inspectorIndex = inspectorAsset ? assets.findIndex((a) => a.id === inspectorAsset.id) : -1;
+  const previewIndex = previewId ? displayAssets.findIndex((a) => a.id === previewId) : -1;
+  const previewAsset = previewIndex >= 0 ? displayAssets[previewIndex] : null;
+  const inspectorAsset = previewAsset ?? displayAssets[0] ?? null;
+  const inspectorIndex = inspectorAsset ? displayAssets.findIndex((a) => a.id === inspectorAsset.id) : -1;
   const selectedCount = selectedIds.size;
+  const facets = useMemo<LibraryFacet[]>(() => {
+    const next: LibraryFacet[] = [];
+    const searchValue = debouncedSearch.trim();
+    if (searchValue) next.push({ id: 'search', label: `“${searchValue}”`, onRemove: () => setSearch('') });
+    if (kind) next.push({
+      id: 'kind',
+      label: KIND_FILTERS.find((filter) => filter.value === kind)?.label ?? kind,
+      onRemove: () => setKind(''),
+    });
+    if (source) next.push({
+      id: 'source',
+      label: SOURCE_FILTERS.find((filter) => filter.value === source)?.label ?? source,
+      onRemove: () => setSource(''),
+    });
+    if (resourceView === 'favorites') next.push({ id: 'favorites', label: t('resources.favorites'), onRemove: () => setResourceView('all') });
+    if (resourceView === 'unsorted') next.push({ id: 'unsorted', label: t('resources.unsorted'), onRemove: () => setResourceView('all') });
+    if (collectionId) next.push({
+      id: 'collection',
+      label: collections.find((collection) => collection.id === collectionId)?.name ?? collectionId,
+      onRemove: () => setCollectionId(''),
+    });
+    return next;
+  }, [collectionId, collections, debouncedSearch, kind, resourceView, source, t]);
 
-  // Day-bucketed groups for the timeline view (newest day first). Items keep
-  // their flat index in `assets` so range/box selection stays consistent across
-  // both views. Grouping by a Map collapses non-contiguous same-day assets.
+  // Day-bucketed groups for the timeline view. Map insertion follows the
+  // selected stable sort, and items keep their flat index in `displayAssets` so
+  // range/box selection stays consistent across every view.
   const timelineGroups = useMemo(() => {
     const map = new Map<string, Array<{ asset: LibraryAsset; index: number }>>();
-    assets.forEach((asset, index) => {
+    displayAssets.forEach((asset, index) => {
       const key = dayKeyOf(asset);
       const bucket = map.get(key);
       if (bucket) bucket.push({ asset, index });
       else map.set(key, [{ asset, index }]);
     });
-    return [...map.entries()]
-      .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
-      .map(([key, items]) => ({ key, items }));
-  }, [assets]);
+    return [...map.entries()].map(([key, items]) => ({ key, items }));
+  }, [displayAssets]);
 
   // Render one memoized card. The wrapper just wires this render's per-card
   // props; `LibraryCard` itself is what skips re-rendering when only another
@@ -1194,13 +1215,13 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           <LibraryInspector
             asset={inspectorAsset}
             hasPrev={inspectorIndex > 0}
-            hasNext={inspectorIndex >= 0 && inspectorIndex < assets.length - 1}
+            hasNext={inspectorIndex >= 0 && inspectorIndex < displayAssets.length - 1}
             onPrev={() => {
-              const prev = assets[inspectorIndex - 1];
+              const prev = displayAssets[inspectorIndex - 1];
               if (prev) setPreviewId(prev.id);
             }}
             onNext={() => {
-              const next = assets[inspectorIndex + 1];
+              const next = displayAssets[inspectorIndex + 1];
               if (next) setPreviewId(next.id);
             }}
             onOpenFullscreen={() => {
@@ -1339,6 +1360,16 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           Upload
         </Button>
       </div>
+
+      <LibraryResultsControls
+        resultCount={displayAssets.length}
+        sort={sort}
+        onSortChange={setSort}
+        facets={facets}
+        selectedCount={selectedCount}
+        exportBusy={exportBusy}
+        onExport={() => void exportSelected()}
+      />
 
       {selectedCount > 0 && !dragging ? (
         <div className={styles.selectionBar}>
@@ -1496,7 +1527,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           onMouseDown={onGridMouseDown}
           data-selecting={selectedCount > 0 ? 'true' : 'false'}
         >
-          {assets.map((asset, index) => renderCard(asset, index))}
+          {displayAssets.map((asset, index) => renderCard(asset, index))}
         </div>
       )}
 
@@ -1559,13 +1590,13 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         <LibraryPreviewModal
           asset={previewAsset}
           hasPrev={previewIndex > 0}
-          hasNext={previewIndex >= 0 && previewIndex < assets.length - 1}
+          hasNext={previewIndex >= 0 && previewIndex < displayAssets.length - 1}
           onPrev={() => {
-            const prev = assets[previewIndex - 1];
+            const prev = displayAssets[previewIndex - 1];
             if (prev) setPreviewId(prev.id);
           }}
           onNext={() => {
-            const next = assets[previewIndex + 1];
+            const next = displayAssets[previewIndex + 1];
             if (next) setPreviewId(next.id);
           }}
           onClose={() => setFullscreenPreviewOpen(false)}

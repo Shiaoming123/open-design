@@ -1065,6 +1065,17 @@ interface BaseDict {
   'resources.addToCollection'?: string;
   'resources.operationFailed'?: string;
   'resources.partialFailure'?: string;
+  'resources.resultCount'?: string;
+  'resources.activeFilters'?: string;
+  'resources.removeFilter'?: string;
+  'resources.sort'?: string;
+  'resources.sortNewest'?: string;
+  'resources.sortOldest'?: string;
+  'resources.sortTitle'?: string;
+  'resources.sortKind'?: string;
+  'resources.exportSelection'?: string;
+  'resources.exportingSelection'?: string;
+  'resources.exportPartial'?: string;
   'resources.sourceClipper'?: string;
   'resources.sourceUpload'?: string;
   'resources.sourceAgent'?: string;

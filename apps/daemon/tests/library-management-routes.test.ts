@@ -1,4 +1,5 @@
 import type http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startServer } from '../src/server.js';
@@ -8,6 +9,7 @@ describe('library management routes', () => {
   let baseUrl: string;
   const assetIds: string[] = [];
   const collectionIds: string[] = [];
+  const projectIds: string[] = [];
 
   beforeAll(async () => {
     const started = (await startServer({ port: 0, returnServer: true })) as {
@@ -24,6 +26,9 @@ describe('library management routes', () => {
     }
     for (const id of collectionIds) {
       await fetch(`${baseUrl}/api/library/collections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    }
+    for (const id of projectIds) {
+      await fetch(`${baseUrl}/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
     }
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
@@ -165,5 +170,85 @@ describe('library management routes', () => {
   it.each(['0', '-1', '1.5', 'not-a-number'])('rejects invalid list limit %s', async (limit) => {
     const response = await fetch(`${baseUrl}/api/library/assets?limit=${encodeURIComponent(limit)}`);
     expect(response.status).toBe(400);
+  });
+
+  it('rejects traversal when applying an asset to a project subdirectory', async () => {
+    const assetId = await ingest('path-safe');
+    const projectId = `library-path-${randomUUID()}`;
+    projectIds.push(projectId);
+    const create = await fetch(`${baseUrl}/api/projects`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: projectId, name: 'Library path safety' }),
+    });
+    expect(create.status).toBe(200);
+
+    const apply = await fetch(`${baseUrl}/api/library/assets/${encodeURIComponent(assetId)}/apply`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ projectId, dir: '../escape' }),
+    });
+    expect(apply.status).toBe(400);
+    expect(await apply.json()).toMatchObject({
+      error: { code: 'INVALID_PATH' },
+    });
+
+    const files = await fetch(`${baseUrl}/api/projects/${encodeURIComponent(projectId)}/files`);
+    expect(files.status).toBe(200);
+    expect((await files.json()) as { files: unknown[] }).toMatchObject({ files: [] });
+  });
+
+  it('rejects invalid collection operations and reports missing members without hiding successes', async () => {
+    const missing = `missing-${randomUUID()}`;
+    const invalidRequests: Array<[string, RequestInit]> = [
+      [`/api/library/collections/${missing}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Nope' }),
+      }],
+      [`/api/library/collections/${missing}`, { method: 'DELETE' }],
+      [`/api/library/collections/${missing}/assets`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assetIds: ['asset'] }),
+      }],
+      [`/api/library/collections/${missing}/assets`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assetIds: ['asset'] }),
+      }],
+    ];
+    for (const [url, init] of invalidRequests) {
+      const response = await fetch(`${baseUrl}${url}`, init);
+      expect(response.status, `${init.method} ${url}`).toBe(404);
+    }
+    const blank = await fetch(`${baseUrl}/api/library/collections`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: '   ' }),
+    });
+    expect(blank.status).toBe(400);
+
+    const assetId = await ingest('collection-partial');
+    const create = await fetch(`${baseUrl}/api/library/collections`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: `Partial ${randomUUID()}` }),
+    });
+    const collection = (await create.json()) as { collection: { id: string } };
+    collectionIds.push(collection.collection.id);
+    const partial = await fetch(
+      `${baseUrl}/api/library/collections/${encodeURIComponent(collection.collection.id)}/assets`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assetIds: [assetId, missing] }),
+      },
+    );
+    expect(partial.status).toBe(207);
+    expect(await partial.json()).toEqual({
+      updated: 1,
+      failures: [{ assetId: missing, code: 'NOT_FOUND', message: 'asset not found' }],
+    });
   });
 });

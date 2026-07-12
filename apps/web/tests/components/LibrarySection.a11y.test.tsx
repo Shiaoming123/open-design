@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryAsset } from '@open-design/contracts';
 
@@ -81,5 +81,26 @@ describe('LibrarySection accessibility', () => {
     expect(screen.getByRole('complementary', { name: 'Preview inspector' })).toBeTruthy();
     expect(screen.getByRole('img', { name: 'A photo' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'List' })).toBeTruthy();
+  });
+
+  it('wires result count, stable sorting, and removable filter facets into the workbench', async () => {
+    fetchLibraryAssets.mockResolvedValue([
+      makeAsset({ id: 'alpha', sourceTitle: 'Alpha', createdAt: 10, capturedAt: 10 }),
+      makeAsset({ id: 'beta', sourceTitle: 'Beta', createdAt: 20, capturedAt: 20 }),
+    ]);
+    render(<LibrarySection active onOpenProject={() => {}} />);
+
+    await screen.findByText('2 resources');
+    expect(screen.getAllByRole('button', { name: /Preview (Alpha|Beta)/ }).map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Preview Beta', 'Preview Alpha']);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort resources' }), { target: { value: 'title' } });
+    expect(screen.getAllByRole('button', { name: /Preview (Alpha|Beta)/ }).map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Preview Alpha', 'Preview Beta']);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by kind' }), { target: { value: 'image' } });
+    const remove = await screen.findByRole('button', { name: 'Remove filter: Images' });
+    fireEvent.click(remove);
+    await waitFor(() => expect((screen.getByRole('combobox', { name: 'Filter by kind' }) as HTMLSelectElement).value).toBe(''));
   });
 });

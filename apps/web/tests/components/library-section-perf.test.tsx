@@ -205,7 +205,7 @@ describe('LibrarySection lazy-mount contract', () => {
   it('mounts html and design-system iframe thumbnails once cards are in view', async () => {
     lazyInView = true;
     render(<LibrarySection active onOpenProject={() => {}} />);
-    await screen.findByText('A design system');
+    await screen.findAllByText('A design system');
     const results = screen.getByRole('region', { name: 'Resource results' });
     await waitFor(() => {
       const srcs = [...results.querySelectorAll('iframe')].map((frame) => frame.getAttribute('src'));
