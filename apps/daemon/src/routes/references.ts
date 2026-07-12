@@ -13,6 +13,14 @@ function positiveLimit(value: unknown): number | undefined | null {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
 }
 
+function optionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string';
+}
+
+function optionalStringArray(value: unknown): value is string[] | undefined {
+  return value === undefined || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
+}
+
 export function registerReferenceRoutes(app: Express, deps: RegisterReferenceRoutesDeps): void {
   const { catalog, sendApiError, authorizeToolRequest } = deps;
   const unavailable = (res: Response, error: unknown) => {
@@ -45,8 +53,22 @@ export function registerReferenceRoutes(app: Express, deps: RegisterReferenceRou
   app.post('/api/references/recommend', (req, res) => {
     const input = req.body as Partial<CuratedReferenceRecommendRequest> | undefined;
     const limit = positiveLimit(input?.limit);
-    if (!input?.profile || typeof input.profile.goal !== 'string' || !input.profile.goal.trim() || limit === null) return sendApiError(res, 400, 'BAD_REQUEST', 'profile.goal is required and limit must be a positive integer');
-    try { return res.json(catalog.recommend({ profile: { ...input.profile, goal: input.profile.goal.trim() }, ...(limit ? { limit } : {}) })); }
+    const profile = input?.profile;
+    const allowed = new Set(['goal', 'audience', 'deliverable', 'styleTraits', 'constraints']);
+    if (!profile || typeof profile.goal !== 'string' || !profile.goal.trim() || limit === null
+      || Object.keys(profile).some((key) => !allowed.has(key))
+      || !optionalString(profile.audience) || !optionalString(profile.deliverable)
+      || !optionalStringArray(profile.styleTraits) || !optionalStringArray(profile.constraints)) {
+      return sendApiError(res, 400, 'BAD_REQUEST', 'profile fields must use the curated reference contract');
+    }
+    const normalized = {
+      goal: profile.goal.trim(),
+      ...(profile.audience !== undefined ? { audience: profile.audience.trim() } : {}),
+      ...(profile.deliverable !== undefined ? { deliverable: profile.deliverable.trim() } : {}),
+      ...(profile.styleTraits !== undefined ? { styleTraits: profile.styleTraits.map((value) => value.trim()).filter(Boolean) } : {}),
+      ...(profile.constraints !== undefined ? { constraints: profile.constraints.map((value) => value.trim()).filter(Boolean) } : {}),
+    };
+    try { return res.json(catalog.recommend({ profile: normalized, ...(limit ? { limit } : {}) })); }
     catch (error) { return unavailable(res, error); }
   });
   app.post('/api/tools/references/search', (req, res) => {

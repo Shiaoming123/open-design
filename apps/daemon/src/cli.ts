@@ -785,7 +785,8 @@ async function runReferences(args) {
   let url;
   let init = {};
   if (sub === 'search') {
-    const query = (flags.query || positional.join(' ')).trim();
+    const filePrompt = await readMemoryPromptFile(flags);
+    const query = (filePrompt ?? flags.query ?? positional.join(' ')).trim();
     if (!query) { console.error('search query required'); process.exit(2); }
     url = '/api/references/search';
     init = {

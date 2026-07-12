@@ -44,10 +44,21 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
+function safeCatalogPath(value: string): boolean {
+  return value.length > 0
+    && !value.startsWith('/')
+    && !value.startsWith('\\')
+    && !value.includes('\\')
+    && !value.split('/').includes('..')
+    && !/^[a-z][a-z0-9+.-]*:/i.test(value);
+}
+
 function normalizeRecord(value: unknown): CatalogRecord | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const item = value as Record<string, unknown>;
   for (const key of ['id','kind','libraryId','status','title']) if (typeof item[key] !== 'string') return null;
+  if (typeof item.sourcePath === 'string' && !safeCatalogPath(item.sourcePath)) return null;
+  if (typeof item.previewPath === 'string' && !safeCatalogPath(item.previewPath)) return null;
   return {
     id: item.id as string, kind: item.kind as string, libraryId: item.libraryId as string,
     status: item.status as string, title: item.title as string,
@@ -98,19 +109,25 @@ function unavailable(error: string): ReferenceCatalog {
 export async function createReferenceCatalog(catalogDir: string | undefined): Promise<ReferenceCatalog> {
   if (!catalogDir?.trim()) return unavailable('OD_REFERENCE_CATALOG_DIR is not configured');
   const root = path.resolve(catalogDir);
-  let parsed: unknown;
   let source = '';
+  let records: CatalogRecord[] = [];
   for (const name of ['search-index.json', 'assets.json']) {
-    try { parsed = JSON.parse(await readFile(path.join(root, name), 'utf8')); source = name; break; } catch {}
+    try {
+      const parsed = JSON.parse(await readFile(path.join(root, name), 'utf8')) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      const container = parsed as Record<string, unknown>;
+      const raw = name === 'search-index.json' ? container.records : container.assets;
+      if (!Array.isArray(raw)) continue;
+      const normalized = raw.map(normalizeRecord).filter((record): record is CatalogRecord => record !== null);
+      if (!normalized.length) continue;
+      source = name;
+      records = normalized;
+      break;
+    } catch {}
   }
-  if (!source || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return unavailable(`invalid reference catalog in ${root}: search-index.json/assets.json not readable`);
+  if (!source || !records.length) {
+    return unavailable(`invalid reference catalog in ${root}: search-index.json/assets.json contain no valid records`);
   }
-  const container = parsed as Record<string, unknown>;
-  const raw = source === 'search-index.json' ? container.records : container.assets;
-  if (!Array.isArray(raw)) return unavailable(`invalid reference catalog ${source}: records array missing`);
-  const records = raw.map(normalizeRecord).filter((record): record is CatalogRecord => record !== null);
-  if (!records.length) return unavailable(`invalid reference catalog ${source}: no valid records`);
   const byId = new Map(records.map((record) => [record.id, record]));
 
   const search = (request: CuratedReferenceSearchRequest): CuratedReferenceSearchResponse => {
@@ -138,8 +155,14 @@ export async function createReferenceCatalog(catalogDir: string | undefined): Pr
     get(id) { const record = byId.get(id); return record ? { reference: toHit(record, 0, []) } : null; },
     recommend(request) {
       const profile = request.profile;
-      const query = [profile.goal, profile.audience, profile.deliverable, ...(profile.styleTraits ?? []), ...(profile.constraints ?? [])].filter(Boolean).join(' ');
-      const candidate = search({ query, limit: MAX_LIMIT }).results;
+      const query = [profile.goal, profile.audience, profile.deliverable, ...(profile.styleTraits ?? [])].filter(Boolean).join(' ');
+      const constraintTerms = terms((profile.constraints ?? []).join(' '));
+      const candidate = search({ query, limit: MAX_LIMIT }).results.map((hit) => {
+        const record = byId.get(hit.id);
+        const haystack = record ? FIELD_WEIGHTS.map(([field]) => fieldText(record, field)).join(' ') : '';
+        const penalty = constraintTerms.filter((term) => haystack.includes(term)).length * 1_000;
+        return penalty ? { ...hit, score: hit.score - penalty } : hit;
+      }).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id));
       const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(request.limit ?? DEFAULT_LIMIT)));
       const diverse: CuratedReferenceHit[] = []; const used = new Set<string>();
       for (const hit of candidate) if (!used.has(hit.libraryId) && diverse.length < limit) { diverse.push(hit); used.add(hit.libraryId); }

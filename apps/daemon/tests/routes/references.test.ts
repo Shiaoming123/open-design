@@ -6,13 +6,14 @@ import type { ReferenceCatalog } from '../../src/references/catalog.js';
 
 describe('reference routes', () => {
   let server: http.Server; let baseUrl = '';
+  const toolScopes: string[] = [];
   const hit = { id:'poster:one', kind:'case-study', libraryId:'poster', status:'accepted', title:'One', snippet:'Grid poster', tags:['poster'], roles:['reference'], score:12, matchedFields:['title'] };
   const search = (request: {query:string}) => ({ query:request.query, results:[hit], total:1 });
   const catalog: ReferenceCatalog = { available:true, search, get:(id)=>id===hit.id?{reference:{...hit,score:0,matchedFields:[]}}:null, recommend:(request)=>({profile:request.profile,results:[hit],total:1}) };
 
   beforeAll(async () => {
     const app=express(); app.use(express.json());
-    registerReferenceRoutes(app,{ catalog, sendApiError:(res,status,code,message)=>res.status(status).json({error:{code,message}}), authorizeToolRequest:()=>({projectId:'p1'}) });
+    registerReferenceRoutes(app,{ catalog, sendApiError:(res,status,code,message)=>res.status(status).json({error:{code,message}}), authorizeToolRequest:(req,res,scope)=>{toolScopes.push(scope);if(req.get('x-deny')){res.status(403).json({error:{code:'FORBIDDEN'}});return null;}return {projectId:'p1'};} });
     server=app.listen(0,'127.0.0.1'); await new Promise<void>(r=>server.once('listening',()=>r()));
     const address=server.address(); baseUrl=`http://127.0.0.1:${typeof address==='object'&&address?address.port:0}`;
   });
@@ -32,5 +33,23 @@ describe('reference routes', () => {
     expect((await fetch(`${baseUrl}/api/references/search`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'})).status).toBe(400);
     expect((await fetch(`${baseUrl}/api/references/recommend`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({profile:{}})})).status).toBe(400);
     expect((await fetch(`${baseUrl}/api/references/missing`)).status).toBe(404);
+  });
+
+  it.each([
+    { goal: 'x', audience: 1 },
+    { goal: 'x', deliverable: [] },
+    { goal: 'x', styleTraits: 'grid' },
+    { goal: 'x', styleTraits: [1] },
+    { goal: 'x', constraints: {} },
+    { goal: 'x', constraints: ['ok', 2] },
+  ])('rejects malformed structured recommendation profile %#', async (profile) => {
+    const response=await fetch(`${baseUrl}/api/references/recommend`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({profile})});
+    expect(response.status).toBe(400);
+  });
+
+  it('denies tool requests through the real authorizer boundary and requests operation scopes', async () => {
+    expect((await fetch(`${baseUrl}/api/tools/references/search`,{method:'POST',headers:{'content-type':'application/json','x-deny':'1'},body:JSON.stringify({query:'poster'})})).status).toBe(403);
+    expect((await fetch(`${baseUrl}/api/tools/references/${encodeURIComponent(hit.id)}`,{headers:{'x-deny':'1'}})).status).toBe(403);
+    expect(toolScopes).toEqual(expect.arrayContaining(['references:search','references:read']));
   });
 });
