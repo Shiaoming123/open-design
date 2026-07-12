@@ -109,6 +109,8 @@ const SOURCE_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'generated', label: 'Generated' },
 ];
 
+const RESOURCE_WINDOW_SIZE = 200;
+
 /** Local `YYYY-MM-DD` for a Date — matches the daemon's `archivedDate` bucket. */
 function ymdLocal(date: Date): string {
   const y = date.getFullYear();
@@ -546,6 +548,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   // Asset currently being turned into an editable OD page (spinner gate).
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid');
+  const [visibleLimit, setVisibleLimit] = useState(RESOURCE_WINDOW_SIZE);
   // "Use in design system" menu state (multi-select → design system).
   const [dsMenuOpen, setDsMenuOpen] = useState(false);
   const [dsList, setDsList] = useState<DesignSystemSummary[]>([]);
@@ -565,6 +568,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     rects: CardRect[];
   } | null>(null);
   const displayAssets = useMemo(() => sortLibraryAssets(assets, sort), [assets, sort]);
+  const windowAssets = useMemo(() => displayAssets.slice(0, visibleLimit), [displayAssets, visibleLimit]);
   const { selectedIds, setSelectedIds, toggleOne, rangeTo, selectAll, clearSelection } =
     useLibrarySelection(displayAssets);
 
@@ -574,7 +578,10 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   useEffect(() => {
     setSelectedIds(new Set());
     setActiveAssetId(null);
+    setVisibleLimit(RESOURCE_WINDOW_SIZE);
   }, [collectionId, debouncedSearch, kind, resourceView, setSelectedIds, source]);
+
+  useEffect(() => setVisibleLimit(RESOURCE_WINDOW_SIZE), [sort, viewMode]);
 
   // Debounce the search box before it touches the network (250ms trailing).
   useEffect(() => {
@@ -1142,14 +1149,14 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   // range/box selection stays consistent across every view.
   const timelineGroups = useMemo(() => {
     const map = new Map<string, Array<{ asset: LibraryAsset; index: number }>>();
-    displayAssets.forEach((asset, index) => {
+    windowAssets.forEach((asset, index) => {
       const key = dayKeyOf(asset);
       const bucket = map.get(key);
       if (bucket) bucket.push({ asset, index });
       else map.set(key, [{ asset, index }]);
     });
     return [...map.entries()].map(([key, items]) => ({ key, items }));
-  }, [displayAssets]);
+  }, [windowAssets]);
 
   // Render one memoized card. The wrapper just wires this render's per-card
   // props; `LibraryCard` itself is what skips re-rendering when only another
@@ -1178,7 +1185,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           <tr><th>Name</th><th>Type</th><th>Source</th><th>Captured</th><th>Size</th><th>Actions</th><th><span className={styles.srOnly}>Selection</span></th></tr>
         </thead>
         <tbody>
-          {displayAssets.map((asset, index) => {
+          {windowAssets.map((asset, index) => {
             const source = primarySource(asset);
             const title = assetTitle(asset);
             const selected = selectedIds.has(asset.id);
@@ -1432,7 +1439,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       />
 
       {selectedCount > 0 && !dragging ? (
-        <div className={styles.selectionBar}>
+        <div className={styles.selectionBar} data-testid="library-selection-bar">
           <span className={styles.selectionCount}>{selectedCount} selected</span>
           <button type="button" className={styles.selectionLink} onClick={selectAll}>
             Select all
@@ -1589,9 +1596,19 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           onMouseDown={onGridMouseDown}
           data-selecting={selectedCount > 0 ? 'true' : 'false'}
         >
-          {displayAssets.map((asset, index) => renderCard(asset, index))}
+          {windowAssets.map((asset, index) => renderCard(asset, index))}
         </div>
       )}
+
+      {displayAssets.length > visibleLimit ? (
+        <Button
+          variant="ghost"
+          className={styles.loadMore}
+          onClick={() => setVisibleLimit((current) => Math.min(current + RESOURCE_WINDOW_SIZE, displayAssets.length))}
+        >
+          Load {Math.min(RESOURCE_WINDOW_SIZE, displayAssets.length - visibleLimit)} more resources
+        </Button>
+      ) : null}
 
       </LibraryWorkbenchLayout>
 

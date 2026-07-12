@@ -75,7 +75,7 @@ export function LibraryWorkbenchLayout({ sidebar, children, inspector }: Props) 
   const filtersOpen = mobilePanel === 'filters';
   const inspectorOpen = mobilePanel === 'inspector';
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-testid="library-workbench">
       <div className={styles.mobileToolbar}>
         <Button ref={filtersTriggerRef} variant="ghost" aria-expanded={filtersOpen} aria-label={t('resources.showFilters')} onClick={() => setMobilePanel(filtersOpen ? null : 'filters')}>
           <Icon name="sliders" size={15} /> {t('resources.filters')}

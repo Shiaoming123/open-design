@@ -9,8 +9,7 @@
 //     still carries the box-select targets (data-asset-card/-id), and only the
 //     real <img>/<iframe> thumbnail mounts once a card is in view.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LibraryAsset } from '@open-design/contracts';
 
@@ -231,25 +230,26 @@ describe('LibrarySection lazy-mount contract', () => {
     });
   });
 
-  it.each([500, 2_000])('keeps %i off-screen resources lightweight within the render budget', async (count) => {
+  it.each([500, 2_000])('windows %i resources and keeps selection responsive', async (count) => {
     fetchLibraryAssets.mockResolvedValue(
       Array.from({ length: count }, (_, index) => makeAsset({ id: `bulk-${count}-${index}`, sourceTitle: `Bulk ${index}` })),
     );
     const started = performance.now();
     const view = render(<LibrarySection active onOpenProject={() => {}} />);
-    await screen.findByText(`Bulk ${count - 1}`);
-    expect(document.querySelectorAll('[data-asset-card]')).toHaveLength(count);
+    await screen.findByText(`${count} resources`);
+    expect(document.querySelectorAll('[data-asset-card]')).toHaveLength(200);
     expect(screen.getByRole('region', { name: 'Resource results' }).querySelector('img, iframe, video')).toBeNull();
-    expect(performance.now() - started).toBeLessThan(count === 500 ? 4_000 : 10_000);
-    view.unmount();
-  });
+    expect(performance.now() - started).toBeLessThan(2_000);
 
-  it('keeps the three-pane, touch-selection, and wrapping batch-bar CSS contracts', () => {
-    const layoutCss = readFileSync(`${process.cwd()}/src/components/LibraryWorkbenchLayout.module.css`, 'utf8');
-    const sectionCss = readFileSync(`${process.cwd()}/src/components/LibrarySection.module.css`, 'utf8');
-    expect(layoutCss).toMatch(/\.sidebar,[\s\S]*?\.inspector[\s\S]*?overflow:\s*auto/);
-    expect(layoutCss).toMatch(/\.results[\s\S]*?overflow:\s*auto/);
-    expect(sectionCss).toMatch(/@media \(hover: none\), \(pointer: coarse\)[\s\S]*?\.selectCheck\s*\{\s*opacity:\s*1/);
-    expect(sectionCss).toMatch(/\.selectionBar\s*\{[\s\S]*?flex-wrap:\s*wrap/);
+    const selectButton = screen.getAllByRole('button', { name: 'Select asset' })[199]!;
+    const interactionStarted = performance.now();
+    fireEvent.click(selectButton);
+    const interactionDuration = performance.now() - interactionStarted;
+    expect(screen.getByText('1 selected')).toBeTruthy();
+    expect(interactionDuration).toBeLessThan(250);
+
+    fireEvent.click(screen.getByRole('button', { name: /Load 200 more resources/ }));
+    expect(document.querySelectorAll('[data-asset-card]')).toHaveLength(400);
+    view.unmount();
   });
 });

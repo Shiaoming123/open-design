@@ -173,6 +173,11 @@
   gap: 16px;
 }
 
+.loadMore {
+  display: flex;
+  margin: 18px auto 2px;
+}
+
 .mutationError {
   margin: 12px 0 0;
   padding: 10px 12px;
