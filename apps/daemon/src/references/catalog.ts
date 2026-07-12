@@ -130,11 +130,11 @@ export async function createReferenceCatalog(catalogDir: string | undefined): Pr
   }
   const byId = new Map(records.map((record) => [record.id, record]));
 
-  const search = (request: CuratedReferenceSearchRequest): CuratedReferenceSearchResponse => {
+  const rank = (request: CuratedReferenceSearchRequest) => {
     const queryTerms = terms(request.query);
     const status = request.status ?? 'accepted';
     const allowedLibraries = request.libraryIds?.length ? new Set(request.libraryIds) : null;
-    const scored = records.filter((record) => record.status === status && (!allowedLibraries || allowedLibraries.has(record.libraryId))).map((record) => {
+    return records.filter((record) => record.status === status && (!allowedLibraries || allowedLibraries.has(record.libraryId))).map((record) => {
       let score = 0; const matchedFields: string[] = [];
       for (const [field, weight] of FIELD_WEIGHTS) {
         const text = fieldText(record, field);
@@ -145,6 +145,10 @@ export async function createReferenceCatalog(catalogDir: string | undefined): Pr
       return { record, score, matchedFields };
     }).filter((item) => queryTerms.length === 0 || item.score > 0)
       .sort((a,b) => b.score - a.score || a.record.id.localeCompare(b.record.id));
+  };
+
+  const search = (request: CuratedReferenceSearchRequest): CuratedReferenceSearchResponse => {
+    const scored = rank(request);
     const limit = Math.min(MAX_LIMIT, Math.max(1, Math.floor(request.limit ?? DEFAULT_LIMIT)));
     return { query: request.query, results: scored.slice(0, limit).map((item) => toHit(item.record, item.score, item.matchedFields)), total: scored.length };
   };
@@ -157,9 +161,9 @@ export async function createReferenceCatalog(catalogDir: string | undefined): Pr
       const profile = request.profile;
       const query = [profile.goal, profile.audience, profile.deliverable, ...(profile.styleTraits ?? [])].filter(Boolean).join(' ');
       const constraintTerms = terms((profile.constraints ?? []).join(' '));
-      const candidate = search({ query, limit: MAX_LIMIT }).results.map((hit) => {
-        const record = byId.get(hit.id);
-        const haystack = record ? FIELD_WEIGHTS.map(([field]) => fieldText(record, field)).join(' ') : '';
+      const candidate = rank({ query }).map(({ record, score, matchedFields }) => {
+        const hit = toHit(record, score, matchedFields);
+        const haystack = FIELD_WEIGHTS.map(([field]) => fieldText(record, field)).join(' ');
         const penalty = constraintTerms.filter((term) => haystack.includes(term)).length * 1_000;
         return penalty ? { ...hit, score: hit.score - penalty } : hit;
       }).sort((a,b) => b.score - a.score || a.id.localeCompare(b.id));

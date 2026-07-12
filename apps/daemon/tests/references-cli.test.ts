@@ -10,6 +10,12 @@ const root=fileURLToPath(new URL('..',import.meta.url)); const cli=fileURLToPath
 function run(base:string,args:string[],input?:string){return new Promise<{code:number;stdout:string;stderr:string}>(resolve=>{const child=spawn(process.execPath,['--import','tsx',cli,'references',...args,'--daemon-url',base,'--json'],{cwd:root,env:{...process.env}});let stdout='';let stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('close',code=>resolve({code:code??0,stdout,stderr}));if(input!==undefined)child.stdin.end(input);else child.stdin.end();});}
 
 describe('od references CLI',()=>{
+  it('documents prompt-file for search',async()=>{
+    const result=await run('http://127.0.0.1:1',['help']);
+    expect(result.code,result.stderr).toBe(0);
+    expect(result.stdout).toContain('search <query> [--prompt-file <path|->]');
+  });
+
   it('keeps search/show/recommend on shared endpoints and supports prompt files',async()=>{
     const seen:Array<{method:string;url:string;body:unknown}>=[];
     const server=http.createServer((req,res)=>{let raw='';req.on('data',c=>raw+=c);req.on('end',()=>{seen.push({method:req.method||'',url:req.url||'',body:raw?JSON.parse(raw):null});res.setHeader('content-type','application/json');res.end(JSON.stringify(req.method==='GET'?{reference:{id:'poster:one'}}:{results:[{id:'poster:one'}],total:1}));});});

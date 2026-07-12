@@ -77,4 +77,32 @@ describe('curated reference catalog', () => {
     expect(result.results[0]?.id).toBe('poster:static');
     expect(result.results.find((hit) => hit.id === 'poster:motion')?.score).toBeLessThan(result.results[0]!.score);
   });
+
+  it('applies negative constraints to the complete accepted candidate set before truncation', async () => {
+    const motionCandidates = Array.from({ length: 21 }, (_, index) => ({
+      ...records[0],
+      id: `motion:${String(index).padStart(2, '0')}`,
+      title: `Launch Poster Motion ${index}`,
+      summary: 'Launch poster with motion',
+      tags: ['launch', 'poster', 'motion'],
+      libraryId: `motion-${index}`,
+    }));
+    const staticCandidate = {
+      ...records[1],
+      id: 'static:outside-top-twenty',
+      title: 'Launch Visual',
+      summary: 'Static launch system',
+      tags: ['launch', 'static'],
+      libraryId: 'static',
+    };
+    const catalog = await createReferenceCatalog(await fixture({
+      schemaVersion: 'od-search-index/v1',
+      records: [...motionCandidates, staticCandidate],
+    }));
+
+    const result = catalog.recommend({ profile: { goal: 'launch poster', constraints: ['motion'] }, limit: 1 });
+
+    expect(result.results[0]?.id).toBe('static:outside-top-twenty');
+    expect(result.total).toBe(22);
+  });
 });

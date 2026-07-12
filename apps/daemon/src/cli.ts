@@ -829,7 +829,7 @@ async function runReferences(args) {
 
 function printReferencesHelp() {
   console.log(`Usage:
-  od references search <query> [--limit 8] [--status accepted] [--library id,id] [--json]
+  od references search <query> [--prompt-file <path|->] [--limit 8] [--status accepted] [--library id,id] [--json]
   od references show <id> [--json]
   od references recommend <goal> [--prompt-file <path|->] [--audience text] [--deliverable text] [--style-traits a,b] [--constraints a,b] [--json]
 
