@@ -66,9 +66,9 @@ describe('router entry sub-views', () => {
     expect(parseRoute('/tasks')).toEqual({ kind: 'home', view: 'tasks' });
   });
 
-  it('hides the library entry route while the Library UI is gated off', () => {
-    expect(parseRoute('/library')).toEqual({ kind: 'home', view: 'home' });
-    expect(buildPath({ kind: 'home', view: 'library' })).toBe('/');
+  it('exposes /library as the Resources entry view', () => {
+    expect(parseRoute('/library')).toEqual({ kind: 'home', view: 'library' });
+    expect(buildPath({ kind: 'home', view: 'library' })).toBe('/library');
   });
 
   it('still parses /projects/<id> as a project detail route', () => {
@@ -88,6 +88,7 @@ describe('router entry sub-views', () => {
       { kind: 'home', view: 'tasks' } as Route,
       { kind: 'home', view: 'plugins' } as Route,
       { kind: 'home', view: 'design-systems' } as Route,
+      { kind: 'home', view: 'library' } as Route,
       { kind: 'home', view: 'integrations' } as Route,
     ]) {
       expect(parseRoute(buildPath(route))).toEqual(route);

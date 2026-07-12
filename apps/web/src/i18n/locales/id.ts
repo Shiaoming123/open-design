@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const id: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'Panggilan model gagal — proses ini dijeda',
   'chat.amrCard.switchBody': 'Beralih ke layanan model resmi Open Design Cloud — tanpa perlu mengatur API Key. Setelah masuk, otorisasi, dan isi ulang, proses ini akan dicoba ulang otomatis.',
   'chat.amrCard.chipOfficial': 'Hosting resmi',
@@ -647,6 +649,7 @@ export const id: Dict = {
   'entry.navTasks': 'Otomatisasi',
   'entry.navPlugins': 'Plugin',
   'entry.navDesignSystems': 'Sistem desain',
+  'resources.title': 'Resources',
   'entry.navBrands': 'Kit Merek',
   'entry.navIntegrations': 'Integrasi',
   'workspaceTabs.project': 'Proyek',

@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const uk: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'Не вдалося викликати модель — це виконання призупинено',
   'chat.amrCard.switchBody': 'Перейдіть на офіційний сервіс моделей Open Design Cloud — без налаштування API-ключа. Після входу, авторизації та поповнення це виконання буде повторено автоматично.',
   'chat.amrCard.chipOfficial': 'Офіційний хостинг',
@@ -647,6 +649,7 @@ export const uk: Dict = {
   'entry.navTasks': 'Автоматизації',
   'entry.navPlugins': 'Плагіни',
   'entry.navDesignSystems': 'Дизайн-системи',
+  'resources.title': 'Resources',
   'entry.navBrands': 'Бренд-кіт',
   'entry.navIntegrations': 'Інтеграції',
   'workspaceTabs.project': 'Проєкт',

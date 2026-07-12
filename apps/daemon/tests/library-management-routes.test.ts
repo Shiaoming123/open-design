@@ -1,0 +1,169 @@
+import type http from 'node:http';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { startServer } from '../src/server.js';
+
+describe('library management routes', () => {
+  let server: http.Server;
+  let baseUrl: string;
+  const assetIds: string[] = [];
+  const collectionIds: string[] = [];
+
+  beforeAll(async () => {
+    const started = (await startServer({ port: 0, returnServer: true })) as {
+      url: string;
+      server: http.Server;
+    };
+    baseUrl = started.url;
+    server = started.server;
+  });
+
+  afterAll(async () => {
+    for (const id of assetIds) {
+      await fetch(`${baseUrl}/api/library/assets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    }
+    for (const id of collectionIds) {
+      await fetch(`${baseUrl}/api/library/collections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    }
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  async function ingest(label: string): Promise<string> {
+    const response = await fetch(`${baseUrl}/api/library/ingest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'text', text: `route-${label}-${Date.now()}`, sourceTitle: label }),
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { asset: { id: string } };
+    assetIds.push(body.asset.id);
+    return body.asset.id;
+  }
+
+  it('updates metadata, manages collections, and exposes membership through list/detail', async () => {
+    const assetId = await ingest('managed');
+    const before = (await (await fetch(`${baseUrl}/api/library/assets/${assetId}`)).json()) as {
+      asset: { updatedAt: number };
+    };
+    const create = await fetch(`${baseUrl}/api/library/collections`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Route references' }),
+    });
+    expect(create.status).toBe(201);
+    const collection = (await create.json()) as { collection: { id: string; name: string } };
+    collectionIds.push(collection.collection.id);
+
+    const patch = await fetch(`${baseUrl}/api/library/assets/${encodeURIComponent(assetId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        patch: { displayName: 'Managed asset', note: 'Keep', favorite: true },
+        expectedUpdatedAt: before.asset.updatedAt,
+      }),
+    });
+    expect(patch.status).toBe(200);
+
+    const add = await fetch(
+      `${baseUrl}/api/library/collections/${encodeURIComponent(collection.collection.id)}/assets`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ assetIds: [assetId] }),
+      },
+    );
+    expect(add.status).toBe(200);
+
+    const detail = await fetch(`${baseUrl}/api/library/assets/${encodeURIComponent(assetId)}`);
+    expect(await detail.json()).toEqual({
+      asset: expect.objectContaining({
+        id: assetId,
+        displayName: 'Managed asset',
+        note: 'Keep',
+        favorite: true,
+        collectionIds: [collection.collection.id],
+      }),
+    });
+
+    const stale = await fetch(`${baseUrl}/api/library/assets/${encodeURIComponent(assetId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ patch: { note: 'stale write' }, expectedUpdatedAt: before.asset.updatedAt }),
+    });
+    expect(stale.status).toBe(409);
+
+    const duplicate = await fetch(`${baseUrl}/api/library/collections`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'route REFERENCES' }),
+    });
+    expect(duplicate.status).toBe(409);
+
+    const second = await fetch(`${baseUrl}/api/library/collections`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Another collection' }),
+    });
+    const secondBody = (await second.json()) as { collection: { id: string } };
+    collectionIds.push(secondBody.collection.id);
+    const renameConflict = await fetch(
+      `${baseUrl}/api/library/collections/${encodeURIComponent(secondBody.collection.id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'ROUTE REFERENCES' }),
+      },
+    );
+    expect(renameConflict.status).toBe(409);
+  });
+
+  it('returns a partial-failure batch result and rejects invalid collections', async () => {
+    const assetId = await ingest('batch');
+    const before = (await (await fetch(`${baseUrl}/api/library/assets/${assetId}`)).json()) as {
+      asset: { updatedAt: number };
+    };
+    const batch = await fetch(`${baseUrl}/api/library/assets/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        assetIds: [assetId, 'does-not-exist'],
+        operation: { type: 'favorite.set', favorite: true },
+      }),
+    });
+    expect(batch.status).toBe(207);
+    expect(await batch.json()).toEqual({
+      updated: 1,
+      failures: [{ assetId: 'does-not-exist', code: 'NOT_FOUND', message: 'asset not found' }],
+    });
+
+    const conflict = await fetch(`${baseUrl}/api/library/assets/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        assetIds: [assetId],
+        operation: { type: 'tags.add', tags: ['stale'] },
+        expectedUpdatedAt: { [assetId]: before.asset.updatedAt },
+      }),
+    });
+    expect(conflict.status).toBe(207);
+    expect(await conflict.json()).toEqual({
+      updated: 0,
+      failures: [{ assetId, code: 'CONFLICT', message: 'asset was modified' }],
+    });
+
+    const invalid = await fetch(`${baseUrl}/api/library/assets/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        assetIds: [assetId],
+        operation: { type: 'collection.add', collectionId: 'missing' },
+      }),
+    });
+    expect(invalid.status).toBe(400);
+  });
+
+  it.each(['0', '-1', '1.5', 'not-a-number'])('rejects invalid list limit %s', async (limit) => {
+    const response = await fetch(`${baseUrl}/api/library/assets?limit=${encodeURIComponent(limit)}`);
+    expect(response.status).toBe(400);
+  });
+});

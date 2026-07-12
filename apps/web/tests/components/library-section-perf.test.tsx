@@ -31,6 +31,10 @@ vi.mock('../../src/providers/registry', () => ({
   fetchDesignSystem: vi.fn(),
   fetchDesignSystems: vi.fn(async () => []),
   fetchLibraryAssetAsFile: vi.fn(),
+  fetchLibraryCollections: vi.fn(async () => []),
+  createLibraryCollection: vi.fn(),
+  applyLibraryBatch: vi.fn(),
+  updateLibraryAssetMetadata: vi.fn(),
 }));
 
 import {
@@ -52,6 +56,8 @@ function makeAsset(over: Partial<LibraryAsset> = {}): LibraryAsset {
     capturedAt: now,
     archivedDate: '2024-01-01',
     contentHash: `hash-${over.id ?? now}`,
+    favorite: false,
+    collectionIds: [],
     tags: [],
     sources: [],
     createdAt: now,
@@ -172,23 +178,25 @@ describe('LibrarySection lazy-mount contract', () => {
 
   it('renders placeholder cards (no img/iframe) that keep box-select targets while off-screen', async () => {
     render(<LibrarySection active onOpenProject={() => {}} />);
-    await screen.findByText('A photo');
+    await screen.findAllByText('A photo');
+    const results = screen.getByRole('region', { name: 'Resource results' });
     // Both cards are present as box-select targets even though nothing is in view.
     expect(document.querySelectorAll('[data-asset-card]')).toHaveLength(3);
     document.querySelectorAll('[data-asset-card]').forEach((el) => {
       expect((el as HTMLElement).dataset.assetId).toBeTruthy();
     });
     // The heavy thumbnails are deferred.
-    expect(document.querySelector('img')).toBeNull();
-    expect(document.querySelector('iframe')).toBeNull();
+    expect(results.querySelector('img')).toBeNull();
+    expect(results.querySelector('iframe')).toBeNull();
   });
 
   it('mounts the real <img> thumbnail once the card is in view', async () => {
     lazyInView = true;
     render(<LibrarySection active onOpenProject={() => {}} />);
-    await screen.findByText('A photo');
+    await screen.findAllByText('A photo');
+    const results = screen.getByRole('region', { name: 'Resource results' });
     await waitFor(() => {
-      const img = document.querySelector('img');
+      const img = results.querySelector('img');
       expect(img).not.toBeNull();
       expect(img?.getAttribute('src')).toBe('/raw/img-1');
     });
@@ -198,8 +206,9 @@ describe('LibrarySection lazy-mount contract', () => {
     lazyInView = true;
     render(<LibrarySection active onOpenProject={() => {}} />);
     await screen.findByText('A design system');
+    const results = screen.getByRole('region', { name: 'Resource results' });
     await waitFor(() => {
-      const srcs = [...document.querySelectorAll('iframe')].map((frame) => frame.getAttribute('src'));
+      const srcs = [...results.querySelectorAll('iframe')].map((frame) => frame.getAttribute('src'));
       expect(srcs).toContain('/raw/html-1');
       expect(srcs).toContain('/raw/ds-1');
     });
@@ -208,13 +217,14 @@ describe('LibrarySection lazy-mount contract', () => {
   it('holds the in-view thumbnail behind a loading skeleton until its bytes land', async () => {
     lazyInView = true;
     render(<LibrarySection active onOpenProject={() => {}} />);
-    await screen.findByText('A photo');
+    await screen.findAllByText('A photo');
+    const results = screen.getByRole('region', { name: 'Resource results' });
     // The shimmer-until-loaded contract (mirrors the clipper image picker): the
     // <img> mounts hidden (`data-loaded="false"`) so the skeleton — not a
     // half-painted image — is what shows while the bytes are in flight. jsdom
     // never fires `load`, so the thumbnail stays in the loading state here.
     await waitFor(() => {
-      const img = document.querySelector('img');
+      const img = results.querySelector('img');
       expect(img).not.toBeNull();
       expect(img?.getAttribute('data-loaded')).toBe('false');
     });

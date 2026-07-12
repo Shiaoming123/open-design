@@ -17,9 +17,17 @@
 // Library surface is a tracked follow-up.
 
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { ChatAttachment, DesignSystemSummary, LibraryAsset } from '@open-design/contracts';
+import type {
+  ChatAttachment,
+  DesignSystemSummary,
+  LibraryAsset,
+  LibraryBatchOperation,
+  LibraryCollection,
+} from '@open-design/contracts';
 import {
   applyLibraryAsset,
+  applyLibraryBatch,
+  createLibraryCollection,
   deleteLibraryAsset,
   editLibraryAssetAsPage,
   fetchDesignSystem,
@@ -27,8 +35,10 @@ import {
   fetchLibraryAsset,
   fetchLibraryAssets,
   fetchLibraryAssetAsFile,
+  fetchLibraryCollections,
   libraryAssetRawUrl,
   syncLibrary,
+  updateLibraryAssetMetadata,
   type LibraryAssetQuery,
 } from '../providers/registry';
 import { useInView } from './plugins-home/useInView';
@@ -53,7 +63,11 @@ import {
 } from './LibraryAssetMeta';
 import { LibraryPreviewModal } from './LibraryPreviewModal';
 import { LibraryUploadModal } from './LibraryUploadModal';
+import { LibraryInspector } from './LibraryInspector';
+import { LibraryResourceSidebar } from './LibraryResourceSidebar';
+import { LibraryWorkbenchLayout } from './LibraryWorkbenchLayout';
 import styles from './LibrarySection.module.css';
+import { useT } from '../i18n';
 
 interface Props {
   active: boolean;
@@ -489,17 +503,25 @@ const LibraryCard = memo(function LibraryCard({
 });
 
 export function LibrarySection({ active, onOpenProject }: Props) {
+  const t = useT();
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [kind, setKind] = useState('');
   const [source, setSource] = useState('');
+  const [resourceView, setResourceView] = useState<'all' | 'favorites' | 'unsorted'>('all');
+  const [collectionId, setCollectionId] = useState('');
+  const [collections, setCollections] = useState<LibraryCollection[]>([]);
+  const [batchTag, setBatchTag] = useState('');
+  const [batchCollectionId, setBatchCollectionId] = useState('');
+  const [mutationError, setMutationError] = useState('');
   const [search, setSearch] = useState('');
   // The input updates `search` instantly (responsive typing) but the server
   // query keys off `debouncedSearch`, so a fast typist fires one request, not
   // one per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [fullscreenPreviewOpen, setFullscreenPreviewOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [band, setBand] = useState<Band | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -509,7 +531,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
   const confirmDeleteTitleId = useId();
   // Asset currently being turned into an editable OD page (spinner gate).
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'timeline'>('grid');
   // "Use in design system" menu state (multi-select → design system).
   const [dsMenuOpen, setDsMenuOpen] = useState(false);
   const [dsList, setDsList] = useState<DesignSystemSummary[]>([]);
@@ -543,15 +565,18 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     if (kind) q.kind = kind === 'element' ? 'image' : kind;
     if (source) q.source = source;
     if (debouncedSearch.trim()) q.q = debouncedSearch.trim();
+    if (resourceView === 'favorites') q.favorite = true;
+    if (resourceView === 'unsorted') q.unsorted = true;
+    if (collectionId) q.collectionId = collectionId;
     return q;
-  }, [kind, source, debouncedSearch]);
+  }, [kind, source, debouncedSearch, resourceView, collectionId]);
 
   // Whether any filter narrows the default newest-first feed. Tracked in a ref
   // so the long-lived SSE subscription can read it without resubscribing on
   // every keystroke. When filters are active the SSE handler can't safely
   // predict membership (server `source` is an EXISTS join, `q` is a fuzzy
   // match), so it falls back to a single full reload.
-  const filtersActive = !!(kind || source || debouncedSearch.trim());
+  const filtersActive = !!(kind || source || debouncedSearch.trim() || resourceView !== 'all' || collectionId);
   const filtersActiveRef = useRef(filtersActive);
   useEffect(() => {
     filtersActiveRef.current = filtersActive;
@@ -585,6 +610,14 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     loadedOnce.current = true;
     void load();
   }, [active, load]);
+
+  const loadCollections = useCallback(async () => {
+    setCollections(await fetchLibraryCollections());
+  }, []);
+
+  useEffect(() => {
+    if (active) void loadCollections();
+  }, [active, loadCollections]);
 
   // Latest `load` for the long-lived SSE subscription to call on fallback,
   // without re-subscribing (which would drop+recreate the EventSource) on every
@@ -667,17 +700,6 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       es?.close();
     };
   }, [active]);
-
-  // Drop selected ids that no longer exist after a reload / delete. Membership
-  // is a single Set lookup so a large grid + large selection stays O(n).
-  useEffect(() => {
-    setSelectedIds((prev) => {
-      if (!prev.size) return prev;
-      const live = new Set(assets.map((a) => a.id));
-      const next = new Set([...prev].filter((id) => live.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [assets]);
 
   const onDelete = useCallback(async (id: string) => {
     const ok = await deleteLibraryAsset(id);
@@ -1025,17 +1047,37 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         e.preventDefault();
         selectAll();
       } else if (e.key === 'Escape') {
-        if (previewId) return; // the preview modal owns Escape while it's open
+        if (fullscreenPreviewOpen) return; // the preview modal owns Escape while it is open
         if (selectedIds.size) setSelectedIds(new Set());
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (typing || previewId || !selectedIds.size) return;
+        if (typing || fullscreenPreviewOpen || !selectedIds.size) return;
         e.preventDefault();
         requestDeleteSelected();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [active, assets, selectedIds, previewId, uploadOpen, confirmDeleteOpen, dsMenuOpen, selectAll, requestDeleteSelected]);
+  }, [active, assets, selectedIds, fullscreenPreviewOpen, uploadOpen, confirmDeleteOpen, dsMenuOpen, selectAll, requestDeleteSelected]);
+
+  const runBatchMutation = useCallback(async (
+    operation: LibraryBatchOperation,
+    onComplete?: () => void,
+  ) => {
+    setMutationError('');
+    try {
+      const result = await applyLibraryBatch([...selectedIds], operation);
+      if (result.failures.length) {
+        setMutationError(t('resources.partialFailure').replace('{count}', String(result.failures.length)));
+      } else {
+        onComplete?.();
+      }
+      if (result.updated) await load();
+      return result.failures.length === 0;
+    } catch (error) {
+      setMutationError(error instanceof Error ? error.message : t('resources.operationFailed'));
+      return false;
+    }
+  }, [load, selectedIds, t]);
 
   // `@font-face` rules for every font asset on screen, so both the grid
   // thumbnails and the preview specimen render in the real typeface.
@@ -1055,6 +1097,8 @@ export function LibrarySection({ active, onOpenProject }: Props) {
 
   const previewIndex = previewId ? assets.findIndex((a) => a.id === previewId) : -1;
   const previewAsset = previewIndex >= 0 ? assets[previewIndex] : null;
+  const inspectorAsset = previewAsset ?? assets[0] ?? null;
+  const inspectorIndex = inspectorAsset ? assets.findIndex((a) => a.id === inspectorAsset.id) : -1;
   const selectedCount = selectedIds.size;
 
   // Day-bucketed groups for the timeline view (newest day first). Items keep
@@ -1102,7 +1146,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
     >
       {fontFaceCss ? <style>{fontFaceCss}</style> : null}
       <header className="entry-section__head">
-        <h1 className="entry-section__title">Library</h1>
+        <h1 className="entry-section__title">{t('resources.title')}</h1>
         <div className={styles.clipperHint}>
           <p className={styles.headerHint}>
             Clip any page, design system, screenshot, image, or Figma import JSON into your Library —
@@ -1119,6 +1163,88 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           </a>
         </div>
       </header>
+
+      <LibraryWorkbenchLayout
+        sidebar={
+          <LibraryResourceSidebar
+            assets={assets}
+            kind={kind}
+            source={source}
+            onKindChange={setKind}
+            onSourceChange={setSource}
+            view={resourceView}
+            collectionId={collectionId}
+            collections={collections}
+            onViewChange={setResourceView}
+            onCollectionChange={setCollectionId}
+            onCreateCollection={(name) => {
+              setMutationError('');
+              void createLibraryCollection(name)
+                .then((created) => {
+                  setCollections((current) => [...current, created]);
+                  setCollectionId(created.id);
+                })
+                .catch((error: unknown) => {
+                  setMutationError(error instanceof Error ? error.message : t('resources.operationFailed'));
+                });
+            }}
+          />
+        }
+        inspector={
+          <LibraryInspector
+            asset={inspectorAsset}
+            hasPrev={inspectorIndex > 0}
+            hasNext={inspectorIndex >= 0 && inspectorIndex < assets.length - 1}
+            onPrev={() => {
+              const prev = assets[inspectorIndex - 1];
+              if (prev) setPreviewId(prev.id);
+            }}
+            onNext={() => {
+              const next = assets[inspectorIndex + 1];
+              if (next) setPreviewId(next.id);
+            }}
+            onOpenFullscreen={() => {
+              if (inspectorAsset?.storage === 'owned') {
+                setPreviewId(inspectorAsset.id);
+                setFullscreenPreviewOpen(true);
+              }
+            }}
+            onOpenProject={onOpenProject}
+            onUseInDesign={(asset) => setSelectedIds(new Set([asset.id]))}
+            collections={collections}
+            onUpdateMetadata={(patch) => {
+              if (!inspectorAsset) return;
+              setMutationError('');
+              void updateLibraryAssetMetadata(inspectorAsset.id, patch, inspectorAsset.updatedAt)
+                .then((updated) => {
+                  setAssets((current) => current.map((asset) => asset.id === updated.id ? updated : asset));
+                })
+                .catch((error: unknown) => {
+                  setMutationError(error instanceof Error ? error.message : t('resources.operationFailed'));
+                });
+            }}
+            onToggleCollection={(nextCollectionId, add) => {
+              if (!inspectorAsset) return;
+              setMutationError('');
+              void applyLibraryBatch([inspectorAsset.id], {
+                type: add ? 'collection.add' : 'collection.remove',
+                collectionId: nextCollectionId,
+              }).then((result) => {
+                if (result.failures.length) {
+                  setMutationError(t('resources.partialFailure').replace('{count}', String(result.failures.length)));
+                  return;
+                }
+                void load();
+                void loadCollections();
+              }).catch((error: unknown) => {
+                setMutationError(error instanceof Error ? error.message : t('resources.operationFailed'));
+              });
+            }}
+          />
+        }
+      >
+
+      {mutationError ? <p className={styles.mutationError} role="alert">{mutationError}</p> : null}
 
       <div className={styles.toolbar}>
         <div className={styles.searchWrap}>
@@ -1156,6 +1282,17 @@ export function LibrarySection({ active, onOpenProject }: Props) {
             data-tooltip-placement="bottom"
           >
             Grid
+          </button>
+          <button
+            type="button"
+            className={`${styles.viewToggleBtn} od-tooltip`}
+            data-active={viewMode === 'list' ? 'true' : 'false'}
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+            data-tooltip="Show compact resource rows"
+            data-tooltip-placement="bottom"
+          >
+            {t('resources.list')}
           </button>
           <button
             type="button"
@@ -1213,6 +1350,47 @@ export function LibrarySection({ active, onOpenProject }: Props) {
             Clear
           </button>
           <span className={styles.selectionSpacer} />
+          <input
+            className={styles.batchInput}
+            aria-label={t('resources.batchTag')}
+            placeholder={t('resources.tagSelection')}
+            value={batchTag}
+            onChange={(event) => setBatchTag(event.target.value)}
+          />
+          <button
+            type="button"
+            className={styles.selectionLink}
+            disabled={!batchTag.trim()}
+            onClick={() => {
+              const tag = batchTag.trim();
+              if (!tag) return;
+              void runBatchMutation({ type: 'tags.add', tags: [tag] }, () => setBatchTag(''));
+            }}
+          >
+            {t('resources.addTag')}
+          </button>
+          <button type="button" className={styles.selectionLink} onClick={() => void runBatchMutation({ type: 'favorite.set', favorite: true })}>
+            {t('resources.favoriteSelection')}
+          </button>
+          {collections.length ? (
+            <select
+              className={styles.batchSelect}
+              aria-label={t('resources.addToCollection')}
+              value={batchCollectionId}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBatchCollectionId(next);
+                if (!next) return;
+                void runBatchMutation({ type: 'collection.add', collectionId: next }, () => {
+                  setBatchCollectionId('');
+                  void loadCollections();
+                });
+              }}
+            >
+              <option value="">{t('resources.addToCollection')}</option>
+              {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}
+            </select>
+          ) : null}
           <button
             type="button"
             className={styles.chatBtn}
@@ -1313,6 +1491,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       ) : (
         <div
           className={styles.grid}
+          data-view={viewMode}
           ref={gridRef}
           onMouseDown={onGridMouseDown}
           data-selecting={selectedCount > 0 ? 'true' : 'false'}
@@ -1320,6 +1499,8 @@ export function LibrarySection({ active, onOpenProject }: Props) {
           {assets.map((asset, index) => renderCard(asset, index))}
         </div>
       )}
+
+      </LibraryWorkbenchLayout>
 
       {band ? (
         <div
@@ -1374,7 +1555,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         </Dialog>
       ) : null}
 
-      {previewAsset ? (
+      {previewAsset && fullscreenPreviewOpen ? (
         <LibraryPreviewModal
           asset={previewAsset}
           hasPrev={previewIndex > 0}
@@ -1387,7 +1568,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
             const next = assets[previewIndex + 1];
             if (next) setPreviewId(next.id);
           }}
-          onClose={() => setPreviewId(null)}
+          onClose={() => setFullscreenPreviewOpen(false)}
           onDelete={(id) => {
             void onDelete(id);
             setPreviewId(null);

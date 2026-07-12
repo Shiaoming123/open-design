@@ -1,3 +1,3 @@
-// Keep the OD Library implementation available while the product surface is
-// intentionally hidden for this release.
-export const LIBRARY_UI_VISIBLE = false;
+// Resources is the product-facing entry point for the local-first asset
+// Library. Keep the flag while downstream embedders migrate their menus.
+export const LIBRARY_UI_VISIBLE = true;

@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const th: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'เรียกใช้โมเดลล้มเหลว — งานนี้ถูกหยุดชั่วคราว',
   'chat.amrCard.switchBody': 'สลับไปยังบริการโมเดล Open Design Cloud อย่างเป็นทางการของ Open Design Cloud — ไม่ต้องตั้งค่า API Key หลังจากเข้าสู่ระบบ ให้สิทธิ์ และเติมเงินแล้ว งานนี้จะถูกลองใหม่โดยอัตโนมัติ',
   'chat.amrCard.chipOfficial': 'โฮสติ้งอย่างเป็นทางการ',
@@ -647,6 +649,7 @@ export const th: Dict = {
   'entry.navTasks': 'การทำงานอัตโนมัติ',
   'entry.navPlugins': 'ปลั๊กอิน',
   'entry.navDesignSystems': 'ดีไซน์ซิสเต็ม',
+  'resources.title': 'Resources',
   'entry.navBrands': 'ชุดแบรนด์',
   'entry.navIntegrations': 'การเชื่อมต่อ',
   'workspaceTabs.project': 'โปรเจกต์',

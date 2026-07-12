@@ -74,6 +74,13 @@ export interface LibraryAsset {
   height?: number;
   size?: number;
   contentHash: string;
+  /** User-facing name. The immutable source title remains available separately. */
+  displayName?: string;
+  /** User-authored working note. */
+  note?: string;
+  favorite: boolean;
+  /** Flat semantic collection memberships. */
+  collectionIds: string[];
   /** AI-enriched (vision) one-line description; absent until enriched. */
   caption?: string;
   /** AI-enriched OCR text; absent until enriched. */
@@ -239,11 +246,80 @@ export interface LibraryAssetFilter {
   source?: LibrarySourceKind;
   projectId?: string;
   designSystemId?: string;
+  favorite?: boolean;
+  collectionId?: string;
+  /** Assets with no collection membership. */
+  unsorted?: boolean;
+  /** Opaque stable cursor returned by the previous list response. */
+  cursor?: string;
   limit?: number;
 }
 
 export interface LibraryAssetListResponse {
   assets: LibraryAsset[];
+  nextCursor?: string;
+}
+
+export interface LibraryCollection {
+  id: string;
+  name: string;
+  assetCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LibraryCollectionListResponse {
+  collections: LibraryCollection[];
+}
+
+export interface LibraryAssetMetadataPatch {
+  displayName?: string | null;
+  note?: string | null;
+  favorite?: boolean;
+  tags?: string[];
+}
+
+export interface LibraryAssetUpdateRequest {
+  patch: LibraryAssetMetadataPatch;
+  /** Optimistic concurrency token from the last-read asset. */
+  expectedUpdatedAt?: number;
+}
+
+export interface LibraryCollectionCreateRequest {
+  name: string;
+}
+
+export interface LibraryCollectionRenameRequest {
+  name: string;
+}
+
+export interface LibraryCollectionMembersRequest {
+  assetIds: string[];
+}
+
+export type LibraryBatchOperation =
+  | { type: 'tags.add'; tags: string[] }
+  | { type: 'tags.remove'; tags: string[] }
+  | { type: 'favorite.set'; favorite: boolean }
+  | { type: 'collection.add'; collectionId: string }
+  | { type: 'collection.remove'; collectionId: string };
+
+export interface LibraryBatchRequest {
+  assetIds: string[];
+  operation: LibraryBatchOperation;
+  /** Optional optimistic concurrency tokens keyed by asset id. */
+  expectedUpdatedAt?: Record<string, number>;
+}
+
+export interface LibraryBatchFailure {
+  assetId: string;
+  code: 'NOT_FOUND' | 'INVALID_COLLECTION' | 'CONFLICT';
+  message: string;
+}
+
+export interface LibraryBatchResponse {
+  updated: number;
+  failures: LibraryBatchFailure[];
 }
 
 export interface LibraryAssetDetailResponse {

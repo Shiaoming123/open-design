@@ -20,6 +20,10 @@ vi.mock('../../src/providers/registry', () => ({
   fetchDesignSystem: vi.fn(),
   fetchDesignSystems: vi.fn(async () => []),
   fetchLibraryAssetAsFile: vi.fn(),
+  fetchLibraryCollections: vi.fn(async () => []),
+  createLibraryCollection: vi.fn(),
+  applyLibraryBatch: vi.fn(),
+  updateLibraryAssetMetadata: vi.fn(),
 }));
 
 import { LibrarySection } from '../../src/components/LibrarySection';
@@ -33,6 +37,8 @@ function makeAsset(over: Partial<LibraryAsset> = {}): LibraryAsset {
     capturedAt: now,
     archivedDate: '2024-01-01',
     contentHash: `hash-${over.id ?? 'asset-1'}`,
+    favorite: false,
+    collectionIds: [],
     tags: [],
     sources: [],
     createdAt: now,
@@ -59,9 +65,21 @@ describe('LibrarySection accessibility', () => {
   it('gives the library filter selects accessible names', async () => {
     render(<LibrarySection active onOpenProject={() => {}} />);
 
-    await screen.findByText('A photo');
+    await screen.findAllByText('A photo');
 
     expect(screen.getByRole('combobox', { name: 'Filter by kind' })).toBeTruthy();
     expect(screen.getByRole('combobox', { name: 'Filter by source' })).toBeTruthy();
+  });
+
+  it('renders the Resources workbench with a persistent preview inspector', async () => {
+    render(<LibrarySection active onOpenProject={() => {}} />);
+
+    await screen.findAllByText('A photo');
+
+    expect(screen.getByRole('complementary', { name: 'Resource filters' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Resource results' })).toBeTruthy();
+    expect(screen.getByRole('complementary', { name: 'Preview inspector' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'A photo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'List' })).toBeTruthy();
   });
 });

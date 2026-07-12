@@ -29,7 +29,7 @@ export const LOCALE_LABEL: Record<Locale, string> = {
 // Translation dictionary shape — flat keys, dot-namespaced. We keep it
 // flat (not deeply nested) so missing-key TS errors point straight at the
 // offending string instead of a generic object mismatch.
-export interface Dict {
+interface BaseDict {
   // Common
   'common.cancel': string;
   'chat.selectFromLibrary': string;
@@ -1015,6 +1015,70 @@ export interface Dict {
   'entry.navTasks': string;
   'entry.navPlugins': string;
   'entry.navDesignSystems': string;
+  'resources.title'?: string;
+  'resources.workspace'?: string;
+  'resources.filters'?: string;
+  'resources.results'?: string;
+  'resources.inspector'?: string;
+  'resources.showFilters'?: string;
+  'resources.closeFilters'?: string;
+  'resources.showInspector'?: string;
+  'resources.closeInspector'?: string;
+  'resources.preview'?: string;
+  'resources.all'?: string;
+  'resources.favorites'?: string;
+  'resources.unsorted'?: string;
+  'resources.types'?: string;
+  'resources.sources'?: string;
+  'resources.collections'?: string;
+  'resources.newCollection'?: string;
+  'resources.newCollectionName'?: string;
+  'resources.createCollection'?: string;
+  'resources.selectPrompt'?: string;
+  'resources.selectPromptDetail'?: string;
+  'resources.previewMissing'?: string;
+  'resources.previewMissingDetail'?: string;
+  'resources.fullscreen'?: string;
+  'resources.previous'?: string;
+  'resources.next'?: string;
+  'resources.favoriteAdd'?: string;
+  'resources.favoriteRemove'?: string;
+  'resources.dimensions'?: string;
+  'resources.size'?: string;
+  'resources.captured'?: string;
+  'resources.storage'?: string;
+  'resources.storageLocal'?: string;
+  'resources.storageReference'?: string;
+  'resources.tags'?: string;
+  'resources.displayName'?: string;
+  'resources.notes'?: string;
+  'resources.saveDetails'?: string;
+  'resources.useInDesign'?: string;
+  'resources.openProject'?: string;
+  'resources.openSource'?: string;
+  'resources.inspectFullscreen'?: string;
+  'resources.list'?: string;
+  'resources.batchTag'?: string;
+  'resources.tagSelection'?: string;
+  'resources.addTag'?: string;
+  'resources.favoriteSelection'?: string;
+  'resources.addToCollection'?: string;
+  'resources.operationFailed'?: string;
+  'resources.partialFailure'?: string;
+  'resources.sourceClipper'?: string;
+  'resources.sourceUpload'?: string;
+  'resources.sourceAgent'?: string;
+  'resources.sourceDesignSystem'?: string;
+  'resources.sourceGenerated'?: string;
+  'resources.kindImage'?: string;
+  'resources.kindElement'?: string;
+  'resources.kindDesignSystem'?: string;
+  'resources.kindVideo'?: string;
+  'resources.kindHtml'?: string;
+  'resources.kindFont'?: string;
+  'resources.kindColor'?: string;
+  'resources.kindText'?: string;
+  'resources.kindUrl'?: string;
   'entry.navBrands': string;
   'entry.navIntegrations': string;
   'workspaceTabs.project': string;
@@ -4319,3 +4383,8 @@ export interface Dict {
   'questions.uploadPartialFailed': string;
   'questions.uploadFailed': string;
 }
+
+type ResourceKey = Extract<keyof BaseDict, `resources.${string}`>;
+
+/** Every locale must provide Resources keys, directly or through its English fallback spread. */
+export type Dict = BaseDict & Required<Pick<BaseDict, ResourceKey>>;

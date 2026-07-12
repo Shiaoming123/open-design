@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const hu: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'Sikertelen modellhívás — ez a futtatás szünetel',
   'chat.amrCard.switchBody': 'Válts az Open Design Cloud hivatalos modellszolgáltatására — nincs szükség API-kulcs beállítására. Bejelentkezés, engedélyezés és feltöltés után ez a futtatás automatikusan újraindul.',
   'chat.amrCard.chipOfficial': 'Hivatalos szolgáltatás',
@@ -647,6 +649,7 @@ export const hu: Dict = {
   'entry.navTasks': 'Automatizálások',
   'entry.navPlugins': 'Pluginok',
   'entry.navDesignSystems': 'Tervezőrendszerek',
+  'resources.title': 'Resources',
   'entry.navBrands': 'Márkacsomag',
   'entry.navIntegrations': 'Integrációk',
   'workspaceTabs.project': 'Projekt',

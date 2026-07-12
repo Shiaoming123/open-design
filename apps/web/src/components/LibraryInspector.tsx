@@ -1,0 +1,246 @@
+import { useEffect, useState } from 'react';
+import type { LibraryAsset, LibraryAssetMetadataPatch, LibraryCollection } from '@open-design/contracts';
+import { Button, Input, Textarea } from '@open-design/components';
+
+import { libraryAssetRawUrl } from '../providers/registry';
+import { Icon } from './Icon';
+import {
+  assetTitle,
+  badgeKind,
+  formatBytes,
+  formatDate,
+  kindLabel,
+  originProjectId,
+} from './LibraryAssetMeta';
+import styles from './LibraryInspector.module.css';
+import { useT } from '../i18n';
+
+interface Props {
+  asset: LibraryAsset | null;
+  hasPrev: boolean;
+  hasNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onOpenFullscreen: () => void;
+  onOpenProject: (projectId: string, fileName?: string) => void;
+  onUseInDesign?: (asset: LibraryAsset) => void;
+  collections?: LibraryCollection[];
+  onUpdateMetadata?: (patch: LibraryAssetMetadataPatch) => void;
+  onToggleCollection?: (collectionId: string, add: boolean) => void;
+}
+
+function hasLocalPreview(asset: LibraryAsset): boolean {
+  return asset.storage === 'owned';
+}
+
+function HtmlPreviewStage({ asset }: { asset: LibraryAsset }) {
+  const [visible, setVisible] = useState(asset);
+  const [pending, setPending] = useState<LibraryAsset | null>(null);
+  useEffect(() => {
+    if (asset.id !== visible.id) setPending(asset);
+  }, [asset, visible.id]);
+
+  return (
+    <>
+      <iframe
+        key={visible.id}
+        className={styles.frame}
+        src={libraryAssetRawUrl(visible.id)}
+        sandbox="allow-scripts"
+        title={assetTitle(visible)}
+      />
+      {pending ? (
+        <iframe
+          key={pending.id}
+          className={`${styles.frame} ${styles.framePending}`}
+          src={libraryAssetRawUrl(pending.id)}
+          sandbox="allow-scripts"
+          title={assetTitle(pending)}
+          aria-hidden="true"
+          onLoad={() => {
+            setVisible(pending);
+            setPending(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function PreviewStage({ asset }: { asset: LibraryAsset }) {
+  const t = useT();
+  const title = assetTitle(asset);
+  const rawUrl = libraryAssetRawUrl(asset.id);
+
+  if (!hasLocalPreview(asset)) {
+    return (
+      <div className={styles.unavailable}>
+        <Icon name="eye-off" size={22} />
+        <strong>{t('resources.previewMissing')}</strong>
+        <span>{t('resources.previewMissingDetail')}</span>
+      </div>
+    );
+  }
+
+  switch (asset.kind) {
+    case 'image':
+      return <img className={styles.media} src={rawUrl} alt={title} />;
+    case 'video':
+      return <video className={styles.media} src={rawUrl} controls preload="metadata" playsInline />;
+    case 'html':
+    case 'design-system':
+      return <HtmlPreviewStage asset={asset} />;
+    case 'font':
+      return (
+        <div className={styles.fontPreview}>
+          <style>{`@font-face{font-family:"od-inspector-${asset.id}";src:url("${rawUrl}");font-display:swap;}`}</style>
+          <span style={{ fontFamily: `"od-inspector-${asset.id}", sans-serif` }}>Ag</span>
+          <small>The quick brown fox jumps over the lazy dog.</small>
+        </div>
+      );
+    case 'color': {
+      const color = asset.palette?.[0];
+      return color ? <div className={styles.color} style={{ background: color }} aria-label={color} /> : null;
+    }
+    default:
+      return (
+        <div className={styles.unavailable}>
+          <Icon name="file-text" size={22} />
+          <strong>{kindLabel(badgeKind(asset))}</strong>
+          <span>{t('resources.inspectFullscreen')}</span>
+        </div>
+      );
+  }
+}
+
+/** Persistent, selection-driven preview and metadata pane. */
+export function LibraryInspector({
+  asset,
+  hasPrev,
+  hasNext,
+  onPrev,
+  onNext,
+  onOpenFullscreen,
+  onOpenProject,
+  onUseInDesign,
+  collections = [],
+  onUpdateMetadata,
+  onToggleCollection,
+}: Props) {
+  const t = useT();
+  const [displayName, setDisplayName] = useState(asset?.displayName ?? '');
+  const [note, setNote] = useState(asset?.note ?? '');
+  useEffect(() => {
+    setDisplayName(asset?.displayName ?? '');
+    setNote(asset?.note ?? '');
+  }, [asset?.id, asset?.displayName, asset?.note]);
+
+  if (!asset) {
+    return (
+      <div className={styles.empty}>
+        <Icon name="eye" size={22} />
+        <strong>{t('resources.selectPrompt')}</strong>
+        <span>{t('resources.selectPromptDetail')}</span>
+      </div>
+    );
+  }
+
+  const title = assetTitle(asset);
+  const projectId = originProjectId(asset);
+  const dimensions = asset.width && asset.height ? `${asset.width}×${asset.height}` : null;
+
+  return (
+    <div className={styles.root}>
+      <header className={styles.head}>
+        <div className={styles.heading}>
+          <span>{kindLabel(badgeKind(asset))}</span>
+          <h2 title={title}>{title}</h2>
+        </div>
+        <div className={styles.headActions}>
+          {onUpdateMetadata ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={asset.favorite ? t('resources.favoriteRemove') : t('resources.favoriteAdd')}
+              onClick={() => onUpdateMetadata({ favorite: !asset.favorite })}
+            >
+              <Icon name="star" size={16} />
+            </Button>
+          ) : null}
+          {hasLocalPreview(asset) ? (
+            <Button variant="ghost" size="icon" aria-label={t('resources.fullscreen')} onClick={onOpenFullscreen}>
+              <Icon name="maximize" size={16} />
+            </Button>
+          ) : null}
+        </div>
+      </header>
+
+      <div className={styles.stage}>
+        <PreviewStage asset={asset} />
+        <div className={styles.navigation}>
+          <Button variant="ghost" size="icon" aria-label={t('resources.previous')} disabled={!hasPrev} onClick={onPrev}>
+            <Icon name="chevron-left" size={17} />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label={t('resources.next')} disabled={!hasNext} onClick={onNext}>
+            <Icon name="chevron-right" size={17} />
+          </Button>
+        </div>
+      </div>
+
+      <dl className={styles.facts}>
+        {dimensions ? <><dt>{t('resources.dimensions')}</dt><dd>{dimensions}</dd></> : null}
+        {asset.size ? <><dt>{t('resources.size')}</dt><dd>{formatBytes(asset.size)}</dd></> : null}
+        <dt>{t('resources.captured')}</dt><dd>{formatDate(asset.capturedAt)}</dd>
+        <dt>{t('resources.storage')}</dt><dd>{asset.storage === 'owned' ? t('resources.storageLocal') : t('resources.storageReference')}</dd>
+        {asset.tags.length ? <><dt>{t('resources.tags')}</dt><dd>{asset.tags.join(', ')}</dd></> : null}
+      </dl>
+
+      {onUpdateMetadata ? (
+        <div className={styles.editor}>
+          <label>
+            <span>{t('resources.displayName')}</span>
+            <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          </label>
+          <label>
+            <span>{t('resources.notes')}</span>
+            <Textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
+          </label>
+          <Button variant="ghost" onClick={() => onUpdateMetadata({ displayName, note })}>{t('resources.saveDetails')}</Button>
+        </div>
+      ) : null}
+
+      {collections.length && onToggleCollection ? (
+        <fieldset className={styles.collections}>
+          <legend>{t('resources.collections')}</legend>
+          {collections.map((collection) => {
+            const checked = asset.collectionIds.includes(collection.id);
+            return (
+              <label key={collection.id}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(event) => onToggleCollection(collection.id, event.target.checked)}
+                />
+                <span>{collection.name}</span>
+              </label>
+            );
+          })}
+        </fieldset>
+      ) : null}
+
+      <div className={styles.actions}>
+        {onUseInDesign && hasLocalPreview(asset) ? (
+          <Button onClick={() => onUseInDesign(asset)}>{t('resources.useInDesign')}</Button>
+        ) : null}
+        {projectId ? (
+          <Button variant="ghost" onClick={() => onOpenProject(projectId, asset.relPath)}>{t('resources.openProject')}</Button>
+        ) : null}
+        {asset.sourceUrl ? (
+          <a className={styles.source} href={asset.sourceUrl} target="_blank" rel="noreferrer">
+            {t('resources.openSource')} <Icon name="external-link" size={13} />
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}

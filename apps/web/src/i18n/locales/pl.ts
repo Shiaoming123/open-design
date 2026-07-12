@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const pl: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'Wywołanie modelu nieudane — to zadanie jest wstrzymane',
   'chat.amrCard.switchBody': 'Przełącz się na oficjalną usługę modeli Open Design Cloud — bez konfigurowania klucza API. Po zalogowaniu, autoryzacji i doładowaniu zadanie zostanie automatycznie ponowione.',
   'chat.amrCard.chipOfficial': 'Oficjalny hosting',
@@ -647,6 +649,7 @@ export const pl: Dict = {
   'entry.navTasks': 'Automatyzacje',
   'entry.navPlugins': 'Wtyczki',
   'entry.navDesignSystems': 'Systemy projektowe',
+  'resources.title': 'Resources',
   'entry.navBrands': 'Zestaw marki',
   'entry.navIntegrations': 'Integracje',
   'workspaceTabs.project': 'Projekt',

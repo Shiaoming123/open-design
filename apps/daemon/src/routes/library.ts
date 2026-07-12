@@ -21,6 +21,8 @@ import type {
   LibraryAsset,
   LibraryAssetFilter,
   LibraryAssetKind,
+  LibraryAssetMetadataPatch,
+  LibraryBatchOperation,
   LibraryEditAsPageResponse,
   LibrarySourceKind,
 } from '@open-design/contracts';
@@ -28,9 +30,16 @@ import { LIBRARY_UPLOAD_MAX_BYTES, isLibraryUploadMimeAllowed } from '@open-desi
 import type { RouteDeps } from '../server-context.js';
 import {
   addLibraryAssetSource,
+  applyLibraryBatchOperation,
+  createLibraryCollection,
   deleteLibraryAsset,
+  deleteLibraryCollection,
   getLibraryAsset,
+  getLibraryCollection,
   listLibraryAssets,
+  listLibraryAssetsPage,
+  listLibraryCollections,
+  renameLibraryCollection,
   updateLibraryAsset,
   type LibraryAssetRecord,
 } from '../library-store.js';
@@ -59,6 +68,7 @@ export interface RegisterLibraryRoutesDeps
   > {}
 
 const MAX_REMOTE_BYTES = 25 * 1024 * 1024;
+const MAX_COLLECTION_NAME_LENGTH = 120;
 
 /** Strip the internal absolute `filePath` before returning an asset to a client. */
 function toPublicAsset(record: LibraryAssetRecord): LibraryAsset {
@@ -104,6 +114,77 @@ function parseDataUrl(dataUrl: string): { bytes: Buffer; mime: string | undefine
     ? Buffer.from(payload, 'base64')
     : Buffer.from(decodeURIComponent(payload), 'utf8');
   return { bytes, mime };
+}
+
+function normalizedCollectionName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const name = value.trim();
+  return name && name.length <= MAX_COLLECTION_NAME_LENGTH ? name : null;
+}
+
+function stringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null;
+  return [...new Set(value.map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseAssetMetadataPatch(value: unknown): LibraryAssetMetadataPatch | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  const allowed = new Set(['displayName', 'note', 'favorite', 'tags']);
+  if (Object.keys(input).length === 0) return null;
+  if (Object.keys(input).some((key) => !allowed.has(key))) return null;
+  const patch: LibraryAssetMetadataPatch = {};
+  if ('displayName' in input) {
+    if (input.displayName !== null && typeof input.displayName !== 'string') return null;
+    patch.displayName = input.displayName === null ? null : input.displayName.trim() || null;
+  }
+  if ('note' in input) {
+    if (input.note !== null && typeof input.note !== 'string') return null;
+    patch.note = input.note === null ? null : input.note.trim() || null;
+  }
+  if ('favorite' in input) {
+    if (typeof input.favorite !== 'boolean') return null;
+    patch.favorite = input.favorite;
+  }
+  if ('tags' in input) {
+    const tags = stringArray(input.tags);
+    if (!tags) return null;
+    patch.tags = tags;
+  }
+  return patch;
+}
+
+function parseBatchOperation(value: unknown): LibraryBatchOperation | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  switch (input.type) {
+    case 'tags.add':
+    case 'tags.remove': {
+      const tags = stringArray(input.tags);
+      return tags ? { type: input.type, tags } : null;
+    }
+    case 'favorite.set':
+      return typeof input.favorite === 'boolean'
+        ? { type: 'favorite.set', favorite: input.favorite }
+        : null;
+    case 'collection.add':
+    case 'collection.remove':
+      return typeof input.collectionId === 'string' && input.collectionId
+        ? { type: input.type, collectionId: input.collectionId }
+        : null;
+    default:
+      return null;
+  }
+}
+
+function parseExpectedUpdatedAt(value: unknown): Record<string, number> | null {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.some(([, timestamp]) => typeof timestamp !== 'number' || !Number.isFinite(timestamp))) {
+    return null;
+  }
+  return Object.fromEntries(entries) as Record<string, number>;
 }
 
 async function fetchRemoteBytes(url: string): Promise<{ bytes: Buffer; mime: string | undefined }> {
@@ -445,11 +526,21 @@ export function registerLibraryRoutes(app: Express, ctx: RegisterLibraryRoutesDe
   // --- assets --------------------------------------------------------------
 
   app.get('/api/library/assets', async (req, res) => {
+    const q = req.query;
+    let limit: number | undefined;
+    if (q.limit !== undefined) {
+      if (typeof q.limit !== 'string') {
+        return sendApiError(res, 400, 'BAD_REQUEST', 'limit must be a positive integer');
+      }
+      limit = Number(q.limit);
+      if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 1000) {
+        return sendApiError(res, 400, 'BAD_REQUEST', 'limit must be a positive integer between 1 and 1000');
+      }
+    }
     // Keep the Library current with design systems / agent output before
     // listing, so an opened grid already shows them. Throttled + best-effort —
     // never blocks the list on a reconcile error.
     await runReconcile(false).catch(() => {});
-    const q = req.query;
     const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length ? v : undefined);
     // Build conditionally — exactOptionalPropertyTypes rejects explicit
     // `undefined` on the optional filter fields.
@@ -462,9 +553,17 @@ export function registerLibraryRoutes(app: Express, ctx: RegisterLibraryRoutesDe
     if (str(q.source)) filter.source = str(q.source) as LibrarySourceKind;
     if (str(q.projectId)) filter.projectId = str(q.projectId)!;
     if (str(q.designSystemId)) filter.designSystemId = str(q.designSystemId)!;
-    if (q.limit) filter.limit = Number(q.limit);
-    const assets = listLibraryAssets(db, filter).map(toPublicAsset);
-    res.json({ assets });
+    if (limit !== undefined) filter.limit = limit;
+    if (q.favorite === 'true' || q.favorite === 'false') filter.favorite = q.favorite === 'true';
+    if (str(q.collectionId)) filter.collectionId = str(q.collectionId)!;
+    if (q.unsorted === 'true') filter.unsorted = true;
+    if (str(q.cursor)) filter.cursor = str(q.cursor)!;
+    const page = listLibraryAssetsPage(db, filter);
+    const response: { assets: LibraryAsset[]; nextCursor?: string } = {
+      assets: page.assets.map(toPublicAsset),
+    };
+    if (page.nextCursor) response.nextCursor = page.nextCursor;
+    res.json(response);
   });
 
   // Force a full reconcile pass (the web "Sync" button + `od library sync`).
@@ -479,10 +578,122 @@ export function registerLibraryRoutes(app: Express, ctx: RegisterLibraryRoutesDe
     }
   });
 
+  app.get('/api/library/collections', (_req, res) => {
+    res.json({ collections: listLibraryCollections(db) });
+  });
+
+  app.post('/api/library/collections', requireLocalDaemonRequest, (req, res) => {
+    const name = normalizedCollectionName(req.body?.name);
+    if (!name) return sendApiError(res, 400, 'BAD_REQUEST', 'collection name is required');
+    try {
+      const collection = createLibraryCollection(db, name);
+      emit('collection', { action: 'create', collectionId: collection.id });
+      res.status(201).json({ collection });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return sendApiError(res, 409, 'COLLECTION_EXISTS', 'collection name already exists');
+      }
+      throw error;
+    }
+  });
+
+  app.patch('/api/library/collections/:id', requireLocalDaemonRequest, (req, res) => {
+    const name = normalizedCollectionName(req.body?.name);
+    if (!name) return sendApiError(res, 400, 'BAD_REQUEST', 'collection name is required');
+    try {
+      if (!renameLibraryCollection(db, req.params.id, name)) {
+        return sendApiError(res, 404, 'NOT_FOUND', 'collection not found');
+      }
+      emit('collection', { action: 'rename', collectionId: req.params.id });
+      res.json({ collection: getLibraryCollection(db, req.params.id) });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+        return sendApiError(res, 409, 'COLLECTION_EXISTS', 'collection name already exists');
+      }
+      throw error;
+    }
+  });
+
+  app.delete('/api/library/collections/:id', requireLocalDaemonRequest, (req, res) => {
+    if (!deleteLibraryCollection(db, req.params.id)) {
+      return sendApiError(res, 404, 'NOT_FOUND', 'collection not found');
+    }
+    emit('collection', { action: 'delete', collectionId: req.params.id });
+    res.json({ ok: true });
+  });
+
+  app.post('/api/library/collections/:id/assets', requireLocalDaemonRequest, (req, res) => {
+    if (!getLibraryCollection(db, req.params.id)) {
+      return sendApiError(res, 404, 'NOT_FOUND', 'collection not found');
+    }
+    const assetIds = stringArray(req.body?.assetIds);
+    if (!assetIds) return sendApiError(res, 400, 'BAD_REQUEST', 'assetIds must be an array of strings');
+    const result = applyLibraryBatchOperation(db, assetIds, {
+      type: 'collection.add',
+      collectionId: req.params.id,
+    });
+    emit('update', { assetIds, operation: 'collection.add' });
+    res.status(result.failures.length ? 207 : 200).json(result);
+  });
+
+  app.delete('/api/library/collections/:id/assets', requireLocalDaemonRequest, (req, res) => {
+    if (!getLibraryCollection(db, req.params.id)) {
+      return sendApiError(res, 404, 'NOT_FOUND', 'collection not found');
+    }
+    const assetIds = stringArray(req.body?.assetIds);
+    if (!assetIds) return sendApiError(res, 400, 'BAD_REQUEST', 'assetIds must be an array of strings');
+    const result = applyLibraryBatchOperation(db, assetIds, {
+      type: 'collection.remove',
+      collectionId: req.params.id,
+    });
+    emit('update', { assetIds, operation: 'collection.remove' });
+    res.status(result.failures.length ? 207 : 200).json(result);
+  });
+
+  // Register the literal route before `:id` so Express never interprets
+  // "batch" as an asset id.
+  app.post('/api/library/assets/batch', requireLocalDaemonRequest, (req, res) => {
+    const assetIds = stringArray(req.body?.assetIds);
+    const operation = parseBatchOperation(req.body?.operation);
+    const expectedUpdatedAt = parseExpectedUpdatedAt(req.body?.expectedUpdatedAt);
+    if (!assetIds || !operation || !expectedUpdatedAt) {
+      return sendApiError(res, 400, 'BAD_REQUEST', 'invalid batch request');
+    }
+    if (
+      (operation.type === 'collection.add' || operation.type === 'collection.remove') &&
+      !getLibraryCollection(db, operation.collectionId)
+    ) {
+      return sendApiError(res, 400, 'INVALID_COLLECTION', 'collection not found');
+    }
+    const result = applyLibraryBatchOperation(db, assetIds, operation, expectedUpdatedAt);
+    emit('update', { assetIds, operation: operation.type });
+    res.status(result.failures.length ? 207 : 200).json(result);
+  });
+
   app.get('/api/library/assets/:id', (req, res) => {
     const asset = getLibraryAsset(db, req.params.id);
     if (!asset) return sendApiError(res, 404, 'NOT_FOUND', 'asset not found');
     res.json({ asset: toPublicAsset(asset) });
+  });
+
+  app.patch('/api/library/assets/:id', requireLocalDaemonRequest, (req, res) => {
+    const asset = getLibraryAsset(db, req.params.id);
+    if (!asset) return sendApiError(res, 404, 'NOT_FOUND', 'asset not found');
+    const patch = parseAssetMetadataPatch(req.body?.patch);
+    if (!patch) return sendApiError(res, 400, 'BAD_REQUEST', 'invalid asset metadata patch');
+    const expectedUpdatedAt = req.body?.expectedUpdatedAt;
+    if (
+      expectedUpdatedAt !== undefined &&
+      (typeof expectedUpdatedAt !== 'number' || !Number.isFinite(expectedUpdatedAt))
+    ) {
+      return sendApiError(res, 400, 'BAD_REQUEST', 'expectedUpdatedAt must be a number');
+    }
+    if (!updateLibraryAsset(db, asset.id, patch, expectedUpdatedAt)) {
+      return sendApiError(res, 409, 'CONFLICT', 'asset was modified');
+    }
+    const updated = getLibraryAsset(db, asset.id)!;
+    emit('update', { assetId: asset.id });
+    res.json({ asset: toPublicAsset(updated) });
   });
 
   app.delete('/api/library/assets/:id', requireLocalDaemonRequest, async (req, res) => {

@@ -193,8 +193,10 @@ const LIBRARY_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 // parse flags without hitting a temporal-dead-zone on these sets.
 const LIBRARY_ASSET_STRING_FLAGS = new Set([
   'daemon-url', 'kind', 'tag', 'source', 'date', 'query', 'project', 'label', 'out', 'dir',
+  'name', 'note', 'add-tag', 'remove-tag', 'collection', 'remove-collection', 'expected-updated-at',
+  'cursor', 'limit', 'domain',
 ]);
-const LIBRARY_ASSET_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
+const LIBRARY_ASSET_BOOLEAN_FLAGS = new Set(['help', 'h', 'json', 'favorite', 'unfavorite', 'unsorted']);
 const DIAGNOSTICS_STRING_FLAGS = new Set(['daemon-url', 'output']);
 const DIAGNOSTICS_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 const CONFIG_STRING_FLAGS = new Set(['daemon-url', 'value', 'value-json']);
@@ -7448,6 +7450,9 @@ function printLibraryHelp() {
 Commands:
   list                      List library assets. Filters: --kind --tag --source --date
   get <id>                  Print one asset (JSON).
+  update <id>               Update display name, note, favorite, or tags.
+  collection <command>      List/create/rename/remove collections and members.
+  batch <id>...             Batch tags, favorite, or collection membership.
   rm <id>                   Delete an asset.
   search <query>            Keyword search across captions / tags / titles.
   import <file|url>...      Import one or more local files / remote URLs into the library.
@@ -7465,8 +7470,22 @@ Options:
   --kind <image|design-system|video|...>
                             Filter/declare asset kind.
   --tag <tag>               Filter by / attach a tag.
+  --name <name>             Asset display name or collection name.
+  --note <note>             Asset working note.
+  --favorite|--unfavorite  Set favorite state.
+  --add-tag|--remove-tag <tag>
+                            Batch tag operation.
+  --collection|--remove-collection <id>
+                            Batch collection operation.
+  --expected-updated-at <ms>
+                            Reject a stale single-asset update.
   --source <kind>           Filter by source (clipper|manual-upload|agent-task|design-system|generated).
   --date <YYYY-MM-DD>       Filter by archive date.
+  --cursor <cursor>         Continue a stable paginated list.
+  --limit <n>               Page size (default: 80).
+  --collection <id>         Filter by collection for list.
+  --favorite                Filter favorite assets for list.
+  --unsorted                Filter assets with no collection for list.
   --project <id>            Target project for apply.
   --dir <subdir>            Subdirectory inside the project for apply (default: library).
   --out <file>              Write the figma export to a file (default: stdout).`);
@@ -7506,6 +7525,12 @@ async function runLibrary(args) {
         if (flags.source) params.set('source', flags.source);
         if (flags.date) params.set('date', flags.date);
         if (flags.project) params.set('projectId', flags.project);
+        if (flags.domain) params.set('domain', flags.domain);
+        if (flags.cursor) params.set('cursor', flags.cursor);
+        if (flags.limit) params.set('limit', flags.limit);
+        if (flags.collection) params.set('collectionId', flags.collection);
+        if (flags.favorite) params.set('favorite', 'true');
+        if (flags.unsorted) params.set('unsorted', 'true');
         const qs = params.toString();
         const resp = await fetch(`${base}/api/library/assets${qs ? `?${qs}` : ''}`);
         if (!resp.ok) return structuredHttpFailure(resp);
@@ -7527,6 +7552,173 @@ async function runLibrary(args) {
         const resp = await fetch(`${base}/api/library/assets/${encodeURIComponent(id)}`);
         if (!resp.ok) return structuredHttpFailure(resp);
         return writeJson(await resp.json());
+      }
+      case 'update': {
+        const id = pos[0];
+        if (!id) {
+          console.error('Usage: od library update <id> [--name <name>] [--note <note>] [--favorite|--unfavorite] [--tag <tag>]');
+          process.exit(2);
+        }
+        if (flags.favorite && flags.unfavorite) {
+          console.error('--favorite and --unfavorite are mutually exclusive');
+          process.exit(2);
+        }
+        const patch = {};
+        if (flags.name !== undefined) patch.displayName = flags.name || null;
+        if (flags.note !== undefined) patch.note = flags.note || null;
+        if (flags.favorite) patch.favorite = true;
+        if (flags.unfavorite) patch.favorite = false;
+        let currentAsset;
+        if (flags.tag !== undefined) {
+          const currentResp = await fetch(`${base}/api/library/assets/${encodeURIComponent(id)}`);
+          if (!currentResp.ok) return structuredHttpFailure(currentResp);
+          currentAsset = (await currentResp.json()).asset;
+          patch.tags = flags.tag
+            ? [...new Set([...(currentAsset.tags ?? []), flags.tag])]
+            : currentAsset.tags ?? [];
+        }
+        if (Object.keys(patch).length === 0) {
+          console.error('update requires at least one metadata flag');
+          process.exit(2);
+        }
+        const body = { patch };
+        if (flags['expected-updated-at'] !== undefined) {
+          const value = Number(flags['expected-updated-at']);
+          if (!Number.isFinite(value)) {
+            console.error('--expected-updated-at must be a number');
+            process.exit(2);
+          }
+          body.expectedUpdatedAt = value;
+        } else if (currentAsset && Number.isFinite(currentAsset.updatedAt)) {
+          // The tag merge is read-modify-write. Carry the read version so a
+          // concurrent edit becomes an explicit conflict instead of losing it.
+          body.expectedUpdatedAt = currentAsset.updatedAt;
+        }
+        const resp = await fetch(`${base}/api/library/assets/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) return structuredHttpFailure(resp);
+        const data = await resp.json();
+        if (flags.json) return writeJson(data);
+        console.log(`updated ${id}`);
+        return;
+      }
+      case 'collection': {
+        const action = pos[0] || 'list';
+        if (action === 'list') {
+          const resp = await fetch(`${base}/api/library/collections`);
+          if (!resp.ok) return structuredHttpFailure(resp);
+          const data = await resp.json();
+          if (flags.json) return writeJson(data);
+          for (const collection of data.collections ?? []) {
+            console.log(`${collection.id}\t${collection.assetCount}\t${collection.name}`);
+          }
+          return;
+        }
+        if (action === 'create') {
+          const name = flags.name || pos[1];
+          if (!name) {
+            console.error('Usage: od library collection create <name>');
+            process.exit(2);
+          }
+          const resp = await fetch(`${base}/api/library/collections`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }),
+          });
+          if (!resp.ok) return structuredHttpFailure(resp);
+          const data = await resp.json();
+          if (flags.json) return writeJson(data);
+          console.log(`created ${data.collection.id}\t${data.collection.name}`);
+          return;
+        }
+        if (action === 'rename') {
+          const id = pos[1];
+          const name = flags.name || pos[2];
+          if (!id || !name) {
+            console.error('Usage: od library collection rename <id> <name>');
+            process.exit(2);
+          }
+          const resp = await fetch(`${base}/api/library/collections/${encodeURIComponent(id)}`, {
+            method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }),
+          });
+          if (!resp.ok) return structuredHttpFailure(resp);
+          const data = await resp.json();
+          if (flags.json) return writeJson(data);
+          console.log(`renamed ${id}\t${data.collection.name}`);
+          return;
+        }
+        if (action === 'rm') {
+          const id = pos[1];
+          if (!id) {
+            console.error('Usage: od library collection rm <id>');
+            process.exit(2);
+          }
+          const resp = await fetch(`${base}/api/library/collections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (!resp.ok) return structuredHttpFailure(resp);
+          const data = await resp.json();
+          if (flags.json) return writeJson(data);
+          console.log(`deleted ${id}`);
+          return;
+        }
+        if (action === 'add' || action === 'remove') {
+          const collectionId = pos[1];
+          const assetIds = pos.slice(2);
+          if (!collectionId || assetIds.length === 0) {
+            console.error(`Usage: od library collection ${action} <collectionId> <assetId>...`);
+            process.exit(2);
+          }
+          const resp = await fetch(`${base}/api/library/collections/${encodeURIComponent(collectionId)}/assets`, {
+            method: action === 'add' ? 'POST' : 'DELETE',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ assetIds }),
+          });
+          if (!resp.ok && resp.status !== 207) return structuredHttpFailure(resp);
+          const data = await resp.json();
+          if (flags.json) {
+            writeJson(data);
+            if (data.failures?.length) process.exit(1);
+            return;
+          }
+          console.log(`updated ${data.updated}; failed ${data.failures?.length ?? 0}`);
+          if (data.failures?.length) process.exit(1);
+          return;
+        }
+        console.error(`unknown subcommand: od library collection ${action}`);
+        process.exit(2);
+      }
+      case 'batch': {
+        const assetIds = pos;
+        if (assetIds.length === 0) {
+          console.error('Usage: od library batch <assetId>... <operation flag>');
+          process.exit(2);
+        }
+        const operations = [
+          flags['add-tag'] !== undefined ? { type: 'tags.add', tags: [flags['add-tag']] } : null,
+          flags['remove-tag'] !== undefined ? { type: 'tags.remove', tags: [flags['remove-tag']] } : null,
+          flags.favorite ? { type: 'favorite.set', favorite: true } : null,
+          flags.unfavorite ? { type: 'favorite.set', favorite: false } : null,
+          flags.collection ? { type: 'collection.add', collectionId: flags.collection } : null,
+          flags['remove-collection'] ? { type: 'collection.remove', collectionId: flags['remove-collection'] } : null,
+        ].filter(Boolean);
+        if (operations.length !== 1) {
+          console.error('batch requires exactly one operation flag');
+          process.exit(2);
+        }
+        const resp = await fetch(`${base}/api/library/assets/batch`, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ assetIds, operation: operations[0] }),
+        });
+        if (!resp.ok && resp.status !== 207) return structuredHttpFailure(resp);
+        const data = await resp.json();
+        if (flags.json) {
+          writeJson(data);
+          if (data.failures?.length) process.exit(1);
+          return;
+        }
+        console.log(`updated ${data.updated}; failed ${data.failures?.length ?? 0}`);
+        if (data.failures?.length) process.exit(1);
+        return;
       }
       case 'rm': {
         const id = pos[0];

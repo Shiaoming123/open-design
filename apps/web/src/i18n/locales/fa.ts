@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const fa: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'فراخوانی مدل ناموفق بود — این اجرا متوقف شد',
   'chat.amrCard.switchBody': 'به سرویس رسمی مدل Open Design Cloud سوئیچ کنید — بدون نیاز به تنظیم کلید API. پس از ورود، اعطای دسترسی و شارژ، این اجرا به‌طور خودکار دوباره انجام می‌شود.',
   'chat.amrCard.chipOfficial': 'میزبانی رسمی',
@@ -647,6 +649,7 @@ export const fa: Dict = {
   'entry.navTasks': 'خودکارسازی‌ها',
   'entry.navPlugins': 'افزونه‌ها',
   'entry.navDesignSystems': 'سیستم‌های طراحی',
+  'resources.title': 'Resources',
   'entry.navBrands': 'کیت برند',
   'entry.navIntegrations': 'یکپارچه‌سازی‌ها',
   'workspaceTabs.project': 'پروژه',

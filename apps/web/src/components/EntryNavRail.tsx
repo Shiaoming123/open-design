@@ -173,8 +173,8 @@ export function EntryNavRail({
         {LIBRARY_UI_VISIBLE ? (
           <NavButton
             active={view === 'library'}
-            ariaLabel="Library"
-            tooltip="Library"
+            ariaLabel={t('resources.title')}
+            tooltip={t('resources.title')}
             onClick={() => selectView('library')}
             testId="entry-nav-library"
           >

@@ -1,0 +1,98 @@
+.root {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 12px;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 7px 3px;
+}
+
+.brand strong {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 17px;
+}
+
+.eyebrow,
+.group h2 {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.group h2 {
+  padding: 0 8px 6px;
+}
+
+.group button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group button:not(:disabled):hover,
+.group button[data-active='true'] {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.group button[data-active='true'] {
+  font-weight: 650;
+}
+
+.group button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.group small {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.collectionHint {
+  margin: 2px 8px 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.newCollection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.newCollection input {
+  min-width: 0;
+  height: 32px;
+  font-size: 11px;
+}

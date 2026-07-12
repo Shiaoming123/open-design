@@ -1,6 +1,8 @@
 import type { Dict } from '../types';
+import { en } from './en';
 
 export const tr: Dict = {
+  ...en,
   'chat.amrCard.switchTitle': 'Model çağrısı başarısız oldu — bu çalıştırma duraklatıldı',
   'chat.amrCard.switchBody': 'Open Design Cloud\'ın resmi model hizmetine geçin — API anahtarı yapılandırması gerekmez. Oturum açma, yetkilendirme ve bakiye yükleme sonrası bu çalıştırma otomatik olarak yeniden denenir.',
   'chat.amrCard.chipOfficial': 'Resmi hizmet',
@@ -647,6 +649,7 @@ export const tr: Dict = {
   'entry.navTasks': 'Otomasyonlar',
   'entry.navPlugins': 'Plugin\'ler',
   'entry.navDesignSystems': 'Tasarım sistemleri',
+  'resources.title': 'Resources',
   'entry.navBrands': 'Marka Kiti',
   'entry.navIntegrations': 'Entegrasyonlar',
   'workspaceTabs.project': 'Proje',

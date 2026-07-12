@@ -2488,6 +2488,11 @@ export async function uninstallDesignSystem(
 import type {
   LibraryApplyResponse,
   LibraryAsset,
+  LibraryAssetMetadataPatch,
+  LibraryBatchOperation,
+  LibraryBatchResponse,
+  LibraryCollection,
+  LibraryCollectionListResponse,
   LibraryAssetListResponse,
   LibraryConnectionStatus,
   LibraryEditAsPageResponse,
@@ -2526,22 +2531,109 @@ export interface LibraryAssetQuery {
   q?: string;
   date?: string;
   tag?: string;
+  favorite?: boolean;
+  collectionId?: string;
+  unsorted?: boolean;
+  cursor?: string;
+  limit?: number;
 }
 
 export async function fetchLibraryAssets(query: LibraryAssetQuery = {}): Promise<LibraryAsset[]> {
   try {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value) params.set(key, value);
-    }
-    const qs = params.toString();
-    const resp = await fetch(`/api/library/assets${qs ? `?${qs}` : ''}`);
-    if (!resp.ok) return [];
-    const json = (await resp.json()) as LibraryAssetListResponse;
-    return json.assets ?? [];
+    const assets: LibraryAsset[] = [];
+    const seenCursors = new Set<string>();
+    let cursor = query.cursor;
+    do {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries({ ...query, cursor })) {
+        if (value !== undefined && value !== '' && value !== false) params.set(key, String(value));
+      }
+      const qs = params.toString();
+      const resp = await fetch(`/api/library/assets${qs ? `?${qs}` : ''}`);
+      if (!resp.ok) return [];
+      const page = (await resp.json()) as LibraryAssetListResponse;
+      assets.push(...(page.assets ?? []));
+      cursor = page.nextCursor;
+      if (cursor && seenCursors.has(cursor)) return [];
+      if (cursor) seenCursors.add(cursor);
+    } while (cursor);
+    return assets;
   } catch {
     return [];
   }
+}
+
+export class LibraryMutationError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'LibraryMutationError';
+  }
+}
+
+async function requireLibraryMutationResponse(resp: Response): Promise<void> {
+  if (resp.ok || resp.status === 207) return;
+  let message = `Library request failed (${resp.status})`;
+  try {
+    const body = (await resp.json()) as { error?: { message?: string }; message?: string };
+    message = body.error?.message ?? body.message ?? message;
+  } catch {
+    // Keep the status-based message when the daemon did not return JSON.
+  }
+  throw new LibraryMutationError(resp.status, message);
+}
+
+export async function updateLibraryAssetMetadata(
+  id: string,
+  patch: LibraryAssetMetadataPatch,
+  expectedUpdatedAt?: number,
+): Promise<LibraryAsset> {
+  const resp = await fetch(`/api/library/assets/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ patch, ...(expectedUpdatedAt === undefined ? {} : { expectedUpdatedAt }) }),
+  });
+  await requireLibraryMutationResponse(resp);
+  const json = (await resp.json()) as { asset?: LibraryAsset };
+  if (!json.asset) throw new LibraryMutationError(resp.status, 'Library response did not include the updated asset');
+  return json.asset;
+}
+
+export async function fetchLibraryCollections(): Promise<LibraryCollection[]> {
+  try {
+    const resp = await fetch('/api/library/collections', { cache: 'no-store' });
+    if (!resp.ok) return [];
+    return ((await resp.json()) as LibraryCollectionListResponse).collections ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createLibraryCollection(name: string): Promise<LibraryCollection> {
+  const resp = await fetch('/api/library/collections', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  await requireLibraryMutationResponse(resp);
+  const collection = ((await resp.json()) as { collection?: LibraryCollection }).collection;
+  if (!collection) throw new LibraryMutationError(resp.status, 'Library response did not include the collection');
+  return collection;
+}
+
+export async function applyLibraryBatch(
+  assetIds: string[],
+  operation: LibraryBatchOperation,
+): Promise<LibraryBatchResponse> {
+  const resp = await fetch('/api/library/assets/batch', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ assetIds, operation }),
+  });
+  await requireLibraryMutationResponse(resp);
+  return (await resp.json()) as LibraryBatchResponse;
 }
 
 /**

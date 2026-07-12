@@ -35,6 +35,8 @@ function makeAsset(over: Partial<LibraryAsset> = {}): LibraryAsset {
     capturedAt: now,
     archivedDate: '2024-01-01',
     contentHash: `hash-${over.id ?? now}`,
+    favorite: false,
+    collectionIds: [],
     tags: [],
     sources: [],
     createdAt: now,
