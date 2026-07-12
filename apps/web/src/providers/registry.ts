@@ -2499,6 +2499,11 @@ import type {
   LibraryIngestResponse,
   LibraryPairingStartResponse,
   LibrarySyncResponse,
+  CuratedReferenceSearchRequest,
+  CuratedReferenceSearchResponse,
+  CuratedReferenceRecommendRequest,
+  CuratedReferenceRecommendResponse,
+  CuratedReferenceDetailResponse,
 } from '@open-design/contracts';
 import { LIBRARY_UPLOAD_MAX_BYTES, isLibraryUploadMimeAllowed } from '@open-design/contracts';
 
@@ -2536,6 +2541,25 @@ export interface LibraryAssetQuery {
   unsorted?: boolean;
   cursor?: string;
   limit?: number;
+}
+
+export async function searchCuratedReferences(request: CuratedReferenceSearchRequest): Promise<CuratedReferenceSearchResponse> {
+  const resp = await fetch('/api/references/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+  if (!resp.ok) throw new Error(`Curated references unavailable (${resp.status})`);
+  return await resp.json() as CuratedReferenceSearchResponse;
+}
+
+export async function fetchCuratedReference(id: string): Promise<CuratedReferenceDetailResponse | null> {
+  const resp = await fetch(`/api/references/${encodeURIComponent(id)}`);
+  if (resp.status === 404) return null;
+  if (!resp.ok) throw new Error(`Curated reference unavailable (${resp.status})`);
+  return await resp.json() as CuratedReferenceDetailResponse;
+}
+
+export async function recommendCuratedReferences(request: CuratedReferenceRecommendRequest): Promise<CuratedReferenceRecommendResponse> {
+  const resp = await fetch('/api/references/recommend', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+  if (!resp.ok) throw new Error(`Curated references unavailable (${resp.status})`);
+  return await resp.json() as CuratedReferenceRecommendResponse;
 }
 
 export async function fetchLibraryAssets(query: LibraryAssetQuery = {}): Promise<LibraryAsset[]> {

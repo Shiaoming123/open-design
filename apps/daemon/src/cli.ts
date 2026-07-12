@@ -120,6 +120,10 @@ const RESEARCH_SEARCH_BOOLEAN_FLAGS = new Set([
   'help',
   'h',
 ]);
+const REFERENCES_STRING_FLAGS = new Set([
+  'daemon-url', 'query', 'limit', 'status', 'library', 'prompt-file', 'audience', 'deliverable', 'style-traits', 'constraints',
+]);
+const REFERENCES_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 
 const PLUGIN_STRING_FLAGS = new Set([
   'daemon-url',
@@ -320,6 +324,7 @@ const SUBCOMMAND_MAP = {
   mcp: runMcp,
   amr: runAmr,
   research: runResearch,
+  references: runReferences,
   plugin: runPlugin,
   ui: runUi,
   marketplace: runMarketplace,
@@ -754,6 +759,80 @@ async function runResearchSearch(rawArgs) {
     process.exit(4);
   }
   process.stdout.write(`${await resp.text()}\n`);
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: od references …
+// ---------------------------------------------------------------------------
+
+async function runReferences(args) {
+  const sub = args.find((value) => value && !value.startsWith('--'));
+  if (!sub || sub === 'help' || args.includes('--help') || args.includes('-h')) {
+    printReferencesHelp();
+    process.exit(sub ? 0 : 2);
+  }
+  const subIndex = args.indexOf(sub);
+  const raw = [...args.slice(0, subIndex), ...args.slice(subIndex + 1)];
+  let flags;
+  try {
+    flags = parseFlags(raw, { string: REFERENCES_STRING_FLAGS, boolean: REFERENCES_BOOLEAN_FLAGS });
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
+  const positional = positionalArgs(raw, REFERENCES_STRING_FLAGS);
+  const daemonUrl = await cliDaemonUrl(flags);
+  let url;
+  let init = {};
+  if (sub === 'search') {
+    const query = (flags.query || positional.join(' ')).trim();
+    if (!query) { console.error('search query required'); process.exit(2); }
+    url = '/api/references/search';
+    init = {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query, ...(flags.limit ? { limit: Number(flags.limit) } : {}), ...(flags.status ? { status: flags.status } : {}), ...(flags.library ? { libraryIds: String(flags.library).split(',').filter(Boolean) } : {}) }),
+    };
+  } else if (sub === 'show') {
+    const id = positional[0];
+    if (!id) { console.error('reference id required'); process.exit(2); }
+    url = `/api/references/${encodeURIComponent(id)}`;
+  } else if (sub === 'recommend') {
+    const filePrompt = await readMemoryPromptFile(flags);
+    const goal = (filePrompt ?? flags.query ?? positional.join(' ')).trim();
+    if (!goal) { console.error('recommend goal or --prompt-file required'); process.exit(2); }
+    const list = (value) => typeof value === 'string' ? value.split(',').map((item) => item.trim()).filter(Boolean) : undefined;
+    url = '/api/references/recommend';
+    init = {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ profile: { goal, ...(flags.audience ? { audience: flags.audience } : {}), ...(flags.deliverable ? { deliverable: flags.deliverable } : {}), ...(flags['style-traits'] ? { styleTraits: list(flags['style-traits']) } : {}), ...(flags.constraints ? { constraints: list(flags.constraints) } : {}) }, ...(flags.limit ? { limit: Number(flags.limit) } : {}) }),
+    };
+  } else {
+    console.error(`unknown subcommand: od references ${sub}`);
+    printReferencesHelp();
+    process.exit(2);
+  }
+  let response;
+  try {
+    response = await fetch(`${daemonUrl.replace(/\/$/, '')}${url}`, init);
+  } catch (error) {
+    surfaceFetchError(error, daemonUrl);
+    process.exit(3);
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    console.error(`daemon ${response.status}: ${text}`);
+    process.exit(4);
+  }
+  process.stdout.write(`${await response.text()}\n`);
+}
+
+function printReferencesHelp() {
+  console.log(`Usage:
+  od references search <query> [--limit 8] [--status accepted] [--library id,id] [--json]
+  od references show <id> [--json]
+  od references recommend <goal> [--prompt-file <path|->] [--audience text] [--deliverable text] [--style-traits a,b] [--constraints a,b] [--json]
+
+Queries the explicitly configured private curated-reference catalog through the local daemon.`);
 }
 
 async function runArtifacts(args) {

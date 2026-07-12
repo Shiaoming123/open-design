@@ -779,6 +779,9 @@
   backdrop-filter: blur(2px);
   animation: libraryDropFade 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
+.surfaceTabs { display: flex; gap: 6px; margin: 0 0 14px; }
+.surfaceTabs button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-panel); color: var(--text-muted); font-weight: 600; cursor: pointer; }
+.surfaceTabs button[aria-selected="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel)); color: var(--text); }
 .dropOverlayInner {
   display: flex;
   flex-direction: column;

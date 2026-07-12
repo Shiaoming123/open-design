@@ -655,6 +655,8 @@ import {
   parseHostHeader,
 } from './origin-validation.js';
 import { registerLibraryRoutes } from './routes/library.js';
+import { registerReferenceRoutes } from './routes/references.js';
+import { createReferenceCatalog } from './references/catalog.js';
 import {
   libraryExtensionAllowedOrigins,
   seedLibraryExtensionOrigins,
@@ -1969,6 +1971,10 @@ export async function startServer({
   }
 
   const app = express();
+  const referenceCatalog = await createReferenceCatalog(process.env.OD_REFERENCE_CATALOG_DIR);
+  if (!referenceCatalog.available && process.env.NODE_ENV !== 'test') {
+    console.warn(`[references] ${referenceCatalog.error}`);
+  }
   installRouteRegistrationGuard(app);
   // Clipper page captures are self-contained HTML with inlined images plus a
   // Figma IR, which for an image-heavy site (The Economist, news front pages)
@@ -2830,6 +2836,11 @@ export async function startServer({
     projectFiles: projectFileDeps,
     conversations: conversationDeps,
     auth: authDeps,
+  });
+  registerReferenceRoutes(app, {
+    catalog: referenceCatalog,
+    sendApiError,
+    authorizeToolRequest,
   });
   app.post('/api/projects/:id/figma/import', (req, res) => {
     figmaUpload.single('file')(req, res, async (err) => {

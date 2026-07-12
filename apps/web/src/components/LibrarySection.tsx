@@ -75,6 +75,7 @@ import {
   type LibrarySort,
 } from './LibraryResultsControls';
 import { LibraryWorkbenchLayout } from './LibraryWorkbenchLayout';
+import { CuratedReferencesPanel } from './CuratedReferencesPanel';
 import { useLibrarySelection } from './useLibrarySelection';
 import styles from './LibrarySection.module.css';
 import { useT } from '../i18n';
@@ -520,6 +521,7 @@ const LibraryCard = memo(function LibraryCard({
 export function LibrarySection({ active, onOpenProject }: Props) {
   const t = useT();
   const [assets, setAssets] = useState<LibraryAsset[]>([]);
+  const [resourceSurface, setResourceSurface] = useState<'runtime' | 'curated'>('runtime');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [kind, setKind] = useState('');
@@ -1251,7 +1253,26 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         </div>
       </header>
 
-      <LibraryWorkbenchLayout
+      <div className={styles.surfaceTabs} role="tablist" aria-label="Resource sources">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resourceSurface === 'runtime'}
+          onClick={() => setResourceSurface('runtime')}
+        >
+          Runtime library
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={resourceSurface === 'curated'}
+          onClick={() => setResourceSurface('curated')}
+        >
+          Curated references
+        </button>
+      </div>
+
+      {resourceSurface === 'curated' ? <CuratedReferencesPanel /> : <LibraryWorkbenchLayout
         sidebar={
           <LibraryResourceSidebar
             assets={assets}
@@ -1610,7 +1631,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         </Button>
       ) : null}
 
-      </LibraryWorkbenchLayout>
+      </LibraryWorkbenchLayout>}
 
       {band ? (
         <div

@@ -7,6 +7,7 @@ import {
   fetchLibraryCollections,
   LibraryMutationError,
   updateLibraryAssetMetadata,
+  searchCuratedReferences,
 } from '../../src/providers/registry';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -65,5 +66,12 @@ describe('Resources registry mutations', () => {
     await expect(updateLibraryAssetMetadata('a1', { note: 'new' }, 42)).rejects.toEqual(
       expect.objectContaining<Partial<LibraryMutationError>>({ status: 409, message: 'asset was modified' }),
     );
+  });
+
+  it('searches curated references through the dedicated daemon surface', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ query: 'poster', results: [], total: 0 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await searchCuratedReferences({ query: 'poster' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/references/search', expect.objectContaining({ method: 'POST', body: JSON.stringify({ query: 'poster' }) }));
   });
 });
