@@ -152,14 +152,15 @@ describe('curated reference catalog', () => {
     expect(catalog.search({ query: '控制台' }).results[0]?.id).toBe('fallback:console');
   });
 
-  it('does not use index records when the declared ranking profile is invalid', async () => {
-    const asset = { ...records[0], id: 'fallback:invalid-ranking', title: 'Workflow Console' };
-    const invalidRanking = { ...ranking, weights: { ...ranking.weights, title: 99 } };
+  it('uses finite dynamic profile weights instead of replacing them with built-in constants', async () => {
+    const titleMatch = { ...records[0], id: 'dynamic:title', title: 'Workflow Console', roles: [] };
+    const roleMatch = { ...records[1], id: 'dynamic:role', title: 'Workflow Tool', roles: ['console'] };
+    const dynamicRanking = { ...ranking, weights: { ...ranking.weights, title: 1, roles: 20 } };
     const catalog = await createReferenceCatalog(await fixture(
-      { schemaVersion: 'od-search-index/v1', ranking: invalidRanking, records: [{ ...asset, title: 'Unrelated index record' }] },
-      { schemaVersion: 'od-asset-catalog/v1', assets: [asset] },
+      { schemaVersion: 'od-search-index/v1', ranking: dynamicRanking, records: [titleMatch, roleMatch] },
+      { schemaVersion: 'od-asset-catalog/v1', assets: [titleMatch, roleMatch] },
     ));
-    expect(catalog.search({ query: '控制台' }).results[0]?.id).toBe('fallback:invalid-ranking');
+    expect(catalog.search({ query: '控制台' }).results.map((hit) => hit.id)).toEqual(['dynamic:role', 'dynamic:title']);
   });
 
   it('returns the full normalized asset from detail while keeping search compact', async () => {

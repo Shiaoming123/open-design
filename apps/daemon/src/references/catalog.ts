@@ -130,11 +130,15 @@ function normalizeRanking(value: unknown): RankingProfile | null {
   if (input.schemaVersion !== 'od-reference-ranking/v1' || input.matchMode !== 'all-concepts' || input.tokenization !== 'unicode-alphanumeric') return null;
   if (!input.weights || typeof input.weights !== 'object' || Array.isArray(input.weights)) return null;
   const weights = input.weights as Record<string, unknown>;
-  if (Object.keys(weights).length !== RANKING_FIELDS.length || RANKING_FIELDS.some((field) => weights[field] !== V1_WEIGHTS[field])) return null;
+  if (RANKING_FIELDS.some((field) => typeof weights[field] !== 'number' || !Number.isFinite(weights[field]))) return null;
   if (!Array.isArray(input.conceptGroups) || !input.conceptGroups.length) return null;
   const conceptGroups = input.conceptGroups.map((group) => strings(group).map((term) => term.trim().toLocaleLowerCase()).filter(Boolean));
-  if (conceptGroups.some((group, index) => !group.length || group.length !== (input.conceptGroups as unknown[][])[index]?.length)) return null;
-  return { schemaVersion: input.schemaVersion, matchMode: input.matchMode, tokenization: input.tokenization, weights: { ...V1_WEIGHTS }, conceptGroups };
+  if (conceptGroups.some((group, index) => group.length < 2 || group.length !== (input.conceptGroups as unknown[][])[index]?.length)) return null;
+  return {
+    schemaVersion: input.schemaVersion, matchMode: input.matchMode, tokenization: input.tokenization,
+    weights: Object.fromEntries(RANKING_FIELDS.map((field) => [field, weights[field]])) as Record<RankingField, number>,
+    conceptGroups,
+  };
 }
 
 function tokens(value: string): string[] {
