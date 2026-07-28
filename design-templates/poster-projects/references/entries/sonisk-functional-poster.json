@@ -1,0 +1,57 @@
+{
+  "id": "sonisk-functional-poster",
+  "category": "functional-festival-poster",
+  "project": {
+    "title": "Functional Poster for Sonisk Music Film Festival",
+    "maker": "Agency Skogen; art direction Magnus Holder Bjørk",
+    "url": "https://awards.europeandesign.org/winner/262643",
+    "medium": "fold-out festival poster and program",
+    "format": "Poster that unfolds into a newspaper-style festival guide"
+  },
+  "why": "A valuable poster reference because the artifact is both a wall-facing key visual and a useful program. Its black-and-yellow system, sound-derived grid, and foldout behavior make information architecture part of the concept.",
+  "compositions": [
+    {
+      "type": "foldout-program",
+      "title": "Poster-to-program transformation",
+      "url": "https://awards.europeandesign.org/winner/262643",
+      "study": "The poster functions as a striking object when closed, then unfolds into a newspaper-style guide for the festival program.",
+      "reuse": "Give a printed key visual a second useful state when the audience needs both recognition at a distance and dense event information."
+    },
+    {
+      "type": "sound-derived-grid",
+      "title": "Identity derived from the subject",
+      "url": "https://awards.europeandesign.org/winner/262643",
+      "study": "The European Design Awards case describes a grid derived from the festival logo, with the logo itself generated from sound.",
+      "reuse": "Derive graphic geometry from the event's medium or behavior so the visual system explains what the event is about without illustration."
+    }
+  ],
+  "assets": [
+    {
+      "type": "limited-color-palette",
+      "role": "recognition and contrast",
+      "notes": "Black and yellow provide a compact, high-contrast system that supports both poster impact and program legibility.",
+      "reuse": "Keep the palette intentionally narrow when a poster needs to survive both display distance and information-heavy interior panels."
+    },
+    {
+      "type": "newspaper-style-program",
+      "role": "functional information layer",
+      "notes": "The foldout format turns a promotional surface into a tactile schedule and guide.",
+      "reuse": "Treat editorial density as a planned second state, not an afterthought added below the hero image."
+    }
+  ],
+  "motion": [],
+  "interactions": [],
+  "implementation": {
+    "format": "Folded print poster that expands into a program",
+    "complexity": "medium",
+    "notes": "The award case documents the transformation, palette, sound-generated logo/grid relationship, and credits. The linked video assets remain external and are not copied."
+  },
+  "capture": {
+    "date": "2026-07-26",
+    "sourceLinks": ["https://awards.europeandesign.org/winner/262643"],
+    "attribution": "Agency Skogen; Magnus Holder Bjørk, Espen Varslot, and Maia Arstad for Sonisk Music Film Festival",
+    "reusePolicy": "inspiration-only",
+    "captureDepth": "case-summary"
+  },
+  "status": "lead"
+}

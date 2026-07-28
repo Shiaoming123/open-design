@@ -1,0 +1,114 @@
+{
+  "id": "love-saves-the-day-2025-campaign",
+  "category": "festival-campaign-visual-system",
+  "project": {
+    "title": "Love Saves The Day 2025",
+    "maker": "Hey! What? for Team Love",
+    "url": "https://www.heywhat.co.uk/lovesavesthedayfestival",
+    "medium": "festival campaign identity and visual toolkit",
+    "format": "Cross-channel campaign spanning lineup reveal, social, print, stage screens, signage, and onsite branding",
+    "period": "2025 campaign"
+  },
+  "why": "A strong campaign reference because one festival image world is treated as a deployable toolkit: the lineup poster sets the visual tone, while photography, stickers, textures, templates, and motion carry the same energy into feeds, screens, and physical space.",
+  "artDirection": [
+    {
+      "type": "typographic-playground",
+      "title": "Type as a living sticker layer",
+      "url": "https://www.heywhat.co.uk/lovesavesthedayfestival",
+      "study": "The case study describes a sticker set that evolved into a typographic playground, giving the campaign a raw, playful layer that can move between static and animated applications.",
+      "reuse": "Build a small vocabulary of type-led stickers that can be rearranged, cropped, and animated without losing recognition."
+    },
+    {
+      "type": "community-photography",
+      "title": "People and place as the campaign signal",
+      "url": "https://www.heywhat.co.uk/lovesavesthedayfestival",
+      "study": "Crowd, city, and festival photography replace generic stock imagery and make the local community the campaign's proof of energy.",
+      "reuse": "Use real participants and recognizable places as a recurring image layer when belonging matters more than polish."
+    },
+    {
+      "type": "textural-key-visual",
+      "title": "One anchor image across the rollout",
+      "url": "https://www.heywhat.co.uk/lovesavesthedayfestival",
+      "study": "An ultra-close crop of the Brouhaha stage anchors the lineup reveal and establishes a bold, textural tone for print, stories, lanyards, and related assets.",
+      "reuse": "Choose one high-recognition crop as the campaign's rally point, then let every format reinterpret its texture instead of inventing a new hero each time."
+    },
+    {
+      "type": "modular-template-system",
+      "title": "Toolkit without visual drift",
+      "url": "https://www.heywhat.co.uk/lovesavesthedayfestival",
+      "study": "Layered textures and modular templates were made easy for the internal team to deploy while retaining the festival's DIY energy.",
+      "reuse": "Design the handoff as a constrained kit: a few color, texture, type, and crop rules that preserve attitude when others produce the next asset."
+    }
+  ],
+  "channels": [
+    {
+      "type": "print",
+      "formats": ["lineup poster", "lanyard", "paste-up"],
+      "study": "The lineup artwork is described as moving from print into the wider campaign system.",
+      "reuse": "Keep the first static key visual legible at poster distance and crop-safe for smaller physical touchpoints."
+    },
+    {
+      "type": "social",
+      "formats": ["feed post", "story", "artist card", "stage breakdown"],
+      "study": "The visual system supports lineup drops, hype-building teasers, artist cards, and stage information in fast-scrolling feeds.",
+      "reuse": "Separate identity layers from content layers so operational information can change without rebuilding the campaign world."
+    },
+    {
+      "type": "onsite-branding",
+      "formats": ["signage", "stage graphics", "environmental applications"],
+      "study": "The same visual narrative extends from digital release moments into onsite signage and festival spaces.",
+      "reuse": "Treat environmental graphics as a continuation of the feed system, with scale and distance as explicit constraints."
+    }
+  ],
+  "motionCutdowns": [
+    {
+      "type": "animated-sticker",
+      "title": "Small motion, high repeatability",
+      "study": "Animated stickers add movement to the campaign's typographic layer and can be reused across social content.",
+      "reuse": "Prefer short, loopable sticker motions with a still-frame fallback for exports, accessibility, and reduced-motion contexts."
+    },
+    {
+      "type": "screen-takeover",
+      "title": "Escalate the same grammar on stage",
+      "study": "The toolkit was designed to flex from frantic feed scrolls to full-stage screen takeovers, keeping the system recognizable at large scale.",
+      "reuse": "Reserve one or two high-contrast transformations for large screens rather than adding unrelated effects."
+    }
+  ],
+  "assets": [
+    {
+      "type": "community-photography",
+      "role": "authenticity and atmosphere",
+      "notes": "The source identifies crowd, city, and festival photography as a central direction; no source photography is copied into this library.",
+      "reuse": "Commission or capture original images with a consistent crop and contrast treatment."
+    },
+    {
+      "type": "typographic-stickers",
+      "role": "expressive campaign layer",
+      "notes": "The source's sticker language is proprietary and is not reproduced in the local preview.",
+      "reuse": "Create original type-led marks with a limited set of transformations and an explicit still fallback."
+    },
+    {
+      "type": "layered-textures",
+      "role": "continuity across formats",
+      "notes": "The case study describes layered textures and modular templates as internal campaign assets; no source files are included.",
+      "reuse": "Build textures from original CSS, SVG, or licensed material so the system remains portable and rights-safe."
+    }
+  ],
+  "implementation": {
+    "format": "Responsive campaign reference with a hero key visual and reusable static/motion toolkit",
+    "complexity": "medium-high",
+    "notes": "The official Hey! What? case study provides direct evidence for the 2025 campaign scope, art direction, channel rollout, and motion behavior. Implementation details are limited to observed principles; proprietary artwork, fonts, video, and brand assets remain external."
+  },
+  "capture": {
+    "date": "2026-07-28",
+    "sourceLinks": [
+      "https://www.heywhat.co.uk/lovesavesthedayfestival",
+      "https://www.lovesavestheday.org/gallery/2025",
+      "https://www.teamlove.org/love-saves-the-day"
+    ],
+    "attribution": "Hey! What? for Team Love / Love Saves The Day; source photography and campaign assets remain with their respective creators.",
+    "reusePolicy": "inspiration-only",
+    "captureDepth": "case-study"
+  },
+  "status": "accepted"
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "od-editorial-magazine-projects/v1",
+  "captured": "2026-07-27",
+  "description": "A source-linked case library for magazine covers, editorial spreads, visual essays, and publication systems. Entries capture reading rhythm, type/image systems, and reusable editorial principles without copying external artwork.",
+  "indexes": {
+    "views": ["entries", "readingRhythm", "compositions", "typeImageSystems"],
+    "compositionTypes": ["editorial-hero-grid", "browser-window-frame", "overlay-mark", "cover-as-entry-point"],
+    "assetTypes": ["illustration", "photography", "display-type", "modular-color-blocks", "editorial-mark"],
+    "motionTypes": [],
+    "interactionTypes": ["framed-navigation", "article-card-rhythm"]
+  },
+  "entryFiles": [
+    "entries/nothing-personal-editorial-platform.json"
+  ]
+}

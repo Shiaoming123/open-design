@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Campaign Visual Projects — grammar study</title>
+  <style>
+    :root { --ink: #171717; --paper: #f6f2e9; --lime: #c7ff3d; --pink: #ff5a8f; --blue: #4c5cff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.35 Arial, Helvetica, sans-serif; }
+    main { min-height: 100vh; padding: 22px; display: grid; gap: 22px; grid-template-rows: auto 1fr auto; }
+    header, footer { display: flex; justify-content: space-between; gap: 16px; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+    .campaign { min-height: 72vh; display: grid; grid-template-columns: 1.15fr .85fr; border: 1px solid var(--ink); overflow: hidden; }
+    .hero { position: relative; display: grid; align-content: space-between; min-height: 580px; padding: clamp(24px, 6vw, 82px); background: var(--pink); overflow: hidden; }
+    .hero::before, .hero::after { content: ''; position: absolute; border: 1px solid var(--ink); border-radius: 50%; opacity: .7; }
+    .hero::before { width: 72%; aspect-ratio: 1; right: -16%; top: 10%; }
+    .hero::after { width: 45%; aspect-ratio: 1; right: 9%; bottom: -13%; background: var(--lime); }
+    .eyebrow, h1, .meta { position: relative; z-index: 1; }
+    .eyebrow { font-weight: 700; }
+    h1 { margin: 0; max-width: 6ch; font-size: clamp(58px, 11vw, 150px); line-height: .8; letter-spacing: -.09em; text-transform: uppercase; }
+    .meta { max-width: 25ch; }
+    .toolkit { display: grid; grid-template-rows: 1fr auto; background: var(--blue); color: var(--paper); }
+    .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; align-content: start; background: var(--ink); }
+    .tile { min-height: 150px; padding: 16px; background: var(--blue); display: grid; align-content: space-between; }
+    .tile:nth-child(2) { background: var(--lime); color: var(--ink); }
+    .tile:nth-child(3) { background: var(--paper); color: var(--ink); }
+    .tile:nth-child(4) { background: var(--pink); color: var(--ink); }
+    .tile b { font-size: 28px; letter-spacing: -.07em; }
+    .ticker { padding: 14px 16px; border-top: 1px solid var(--paper); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    footer a { color: inherit; }
+    @media (max-width: 700px) { main { padding: 12px; } .campaign { grid-template-columns: 1fr; } .hero { min-height: 52vh; } }
+  </style>
+</head>
+<body>
+  <main data-od-id="campaign-visual-projects-preview">
+    <header><span>Open Design / campaign visuals</span><span>Original grammar study</span></header>
+    <section class="campaign" aria-label="Original campaign visual grammar study">
+      <article class="hero" data-od-id="campaign-hero">
+        <div class="eyebrow">CAMPAIGN / 01</div>
+        <h1>Make<br />the<br />crowd</h1>
+        <div class="meta">Anchor a campaign in one loud image, then let the toolkit repeat its energy across every touchpoint.</div>
+      </article>
+      <aside class="toolkit" data-od-id="campaign-toolkit">
+        <div class="tiles">
+          <div class="tile"><span>Static key visual</span><b>01</b></div>
+          <div class="tile"><span>Animated sticker</span><b>02</b></div>
+          <div class="tile"><span>Social crop</span><b>03</b></div>
+          <div class="tile"><span>Screen loop</span><b>04</b></div>
+        </div>
+        <div class="ticker">One visual world / many moments / original assets only</div>
+      </aside>
+    </section>
+    <footer><span>Source-linked visual notes</span><a href="./references/catalog.json">View entries →</a></footer>
+  </main>
+</body>
+</html>

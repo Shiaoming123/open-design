@@ -1,0 +1,57 @@
+{
+  "id": "giff-2025-technological-aesthetics-poster",
+  "category": "festival-poster-system",
+  "project": {
+    "title": "GIFF 2025 Poster",
+    "maker": "Andréa Philippon for the Geneva International Film Festival",
+    "url": "https://www.giff.ch/en/affiche-2025/",
+    "medium": "festival poster and visual identity",
+    "format": "Poster system for GIFF and Geneva Digital Market"
+  },
+  "why": "A clear reference for making a complex festival feel interconnected: colorful transparent blocks form the two event logos, turning system logic and data-like assembly into the poster's primary image.",
+  "compositions": [
+    {
+      "type": "transparent-block-logo",
+      "title": "Logos as a constructed object",
+      "url": "https://www.giff.ch/en/affiche-2025/",
+      "study": "Transparent, colorful blocks interlock to form GIFF and GDM, so the mark reads as a built environment rather than a flat lockup.",
+      "reuse": "Translate a multi-part event or product family into one modular object whose pieces can recombine across formats."
+    },
+    {
+      "type": "modular-color-field",
+      "title": "Accessible data-wall energy",
+      "url": "https://www.giff.ch/en/affiche-2025/",
+      "study": "The visual language pairs vivid color with transparent overlaps and dynamic blocks, balancing technological aesthetics with an accessible festival tone.",
+      "reuse": "Use a saturated palette with translucent layers when a technical theme needs warmth and collective energy rather than cold interface literalism."
+    }
+  ],
+  "assets": [
+    {
+      "type": "transparent-3d-blocks",
+      "role": "primary image grammar",
+      "notes": "The source describes the blocks as colorful, transparent, dynamic, and interlocking; no external assets are copied into this library.",
+      "reuse": "Rebuild the grammar with original CSS, SVG, or 3D primitives rather than reusing the source artwork."
+    },
+    {
+      "type": "display-type",
+      "role": "event identification",
+      "notes": "The formed logos carry the identity while the modular blocks supply the visual texture.",
+      "reuse": "Let identity emerge from the construction system when a poster must hold multiple related names."
+    }
+  ],
+  "motion": [],
+  "interactions": [],
+  "implementation": {
+    "format": "Poster-led festival identity with a modular 3D/block visual language",
+    "complexity": "medium",
+    "notes": "The official GIFF page documents the artist, event context, material language, and the relationship between GIFF and GDM. It is sufficient for an accepted composition study, but not a source for copied artwork or production assets."
+  },
+  "capture": {
+    "date": "2026-07-26",
+    "sourceLinks": ["https://www.giff.ch/en/affiche-2025/", "https://andreaphilippon.com/"],
+    "attribution": "Andréa Philippon for the Geneva International Film Festival and Geneva Digital Market",
+    "reusePolicy": "inspiration-only",
+    "captureDepth": "artifact-study"
+  },
+  "status": "accepted"
+}

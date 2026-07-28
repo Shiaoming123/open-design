@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "od-campaign-visual-projects/v1",
+  "captured": "2026-07-28",
+  "description": "A source-linked case library for brand campaigns, promotional images, social visual systems, and static plus dynamic campaign assets. Entries capture art direction, channel formats, motion cutdowns, and reusable principles without copying external artwork.",
+  "indexes": {
+    "views": ["entries", "artDirection", "channels", "motionCutdowns"],
+    "artDirectionTypes": ["typographic-playground", "community-photography", "textural-key-visual", "modular-template-system"],
+    "channelTypes": ["print", "social", "onsite-branding", "stage-screen"],
+    "motionTypes": ["animated-sticker", "feed-motion", "screen-takeover", "teaser-loop"]
+  },
+  "entryFiles": [
+    "entries/love-saves-the-day-2025-campaign.json"
+  ]
+}

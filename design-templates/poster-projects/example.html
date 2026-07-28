@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Poster Projects — grammar study</title>
+  <style>
+    :root { --ink: #111; --paper: #f1eee6; --acid: #d7ff3f; --signal: #ff5b37; --line: rgba(17,17,17,.25); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.35 Arial, Helvetica, sans-serif; }
+    main { min-height: 100vh; padding: 24px; display: grid; gap: 24px; grid-template-rows: auto 1fr auto; }
+    header, footer { display: flex; justify-content: space-between; gap: 20px; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+    .poster { min-height: 72vh; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+    .field { position: relative; padding: clamp(24px, 5vw, 72px); display: grid; align-content: space-between; min-height: 560px; }
+    .field:first-child { background: var(--acid); color: var(--ink); }
+    .field:last-child { background: var(--signal); }
+    .field::after { content: ''; position: absolute; inset: 12% 18%; border: 1px solid currentColor; border-radius: 50%; opacity: .5; transform: rotate(-18deg); }
+    .eyebrow { position: relative; z-index: 1; font-size: 12px; font-weight: 700; }
+    h1 { position: relative; z-index: 1; margin: 0; max-width: 7ch; font-size: clamp(54px, 11vw, 150px); line-height: .82; letter-spacing: -.08em; text-transform: uppercase; }
+    .block-grid { position: absolute; z-index: 0; right: 12%; bottom: 14%; width: 42%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; transform: rotate(8deg); }
+    .block-grid i { display: block; background: currentColor; opacity: .78; }
+    .block-grid i:nth-child(3n) { opacity: .18; }
+    .meta { position: relative; z-index: 1; max-width: 20ch; font-size: 12px; }
+    footer a { color: inherit; }
+    @media (max-width: 700px) { main { padding: 14px; } .poster { grid-template-columns: 1fr; } .field { min-height: 48vh; } }
+  </style>
+</head>
+<body>
+  <main data-od-id="poster-projects-preview">
+    <header><span>Open Design / poster projects</span><span>Original grammar study</span></header>
+    <section class="poster" aria-label="Original poster grammar study">
+      <article class="field" data-od-id="typographic-field">
+        <div class="eyebrow">FORM / SIGNAL / 01</div>
+        <h1>Make<br />the<br />field</h1>
+        <div class="meta">Use a compact declarative line as the image. Let contrast and cropping carry the urgency.</div>
+        <div class="block-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </article>
+      <article class="field" data-od-id="modular-field">
+        <div class="eyebrow">SYSTEM / RHYTHM / 02</div>
+        <h1>Fold<br />the<br />signal</h1>
+        <div class="meta">Repeat one modular geometry across formats, then reserve one transformation for the audience.</div>
+        <div class="block-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </article>
+    </section>
+    <footer><span>Source-linked visual notes</span><a href="./references/catalog.json">View entries →</a></footer>
+  </main>
+</body>
+</html>

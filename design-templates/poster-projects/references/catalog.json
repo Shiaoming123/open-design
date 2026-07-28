@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "od-poster-projects/v1",
+  "captured": "2026-07-26",
+  "description": "A source-linked case library for notable posters, key visuals, and typographic print artifacts. Entries capture composition, asset logic, and reusable visual principles without copying external artwork.",
+  "indexes": {
+    "views": ["entries", "compositions", "assets"],
+    "compositionTypes": ["transparent-block-logo", "modular-color-field", "foldout-program", "sound-derived-grid", "declarative-type-lockup"],
+    "assetTypes": ["transparent-3d-blocks", "display-type", "limited-color-palette", "sound-generated-identity", "newspaper-style-program"],
+    "motionTypes": [],
+    "interactionTypes": []
+  },
+  "entryFiles": [
+    "entries/giff-2025-technological-aesthetics-poster.json",
+    "entries/sonisk-functional-poster.json"
+  ]
+}

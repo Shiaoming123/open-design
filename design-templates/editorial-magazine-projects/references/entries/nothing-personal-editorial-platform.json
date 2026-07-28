@@ -1,0 +1,95 @@
+{
+  "id": "nothing-personal-editorial-platform",
+  "category": "counterculture-editorial-platform",
+  "project": {
+    "title": "Nothing Personal",
+    "maker": "Natasha Jen and team at Pentagram for Mozilla Foundation",
+    "url": "https://www.mozillafoundation.org/en/nothing-personal/",
+    "medium": "digital editorial platform and magazine identity",
+    "format": "Responsive editorial site with feature stories, product reviews, advice, and podcast content",
+    "period": "2025 launch; Pentagram work published 2026"
+  },
+  "why": "A useful contemporary editorial reference because it treats the browser as part of the publication's visual language: the identity can feel like a magazine, a web page, and a conversation with internet culture at the same time.",
+  "readingRhythm": [
+    {
+      "type": "editorial-hero-grid",
+      "title": "One strong thesis before the index",
+      "study": "The official platform places a large editorial proposition and featured story material before the supporting review, humor, and podcast sections.",
+      "reuse": "Give a publication landing page one unmistakable point of view before exposing the full archive or content taxonomy."
+    },
+    {
+      "type": "article-card-rhythm",
+      "title": "Mix deep reads with utility beats",
+      "study": "Feature stories, technology product reviews, advice, and audio content sit in adjacent but distinct content modes.",
+      "reuse": "Use different content lengths and tones as pacing devices, while keeping shared labels and framing consistent enough to feel like one issue."
+    }
+  ],
+  "compositions": [
+    {
+      "type": "browser-window-frame",
+      "title": "Web vernacular as editorial framing",
+      "url": "https://www.itsnicethat.com/articles/mozilla-foundation-pentagram-graphic-design-project-131125",
+      "study": "The credited case study describes a visual language borrowing from pop-ups, chat windows, and browser bars, treating interruption as part of the publication's human mark.",
+      "reuse": "Turn familiar interface containers into editorial punctuation for stories about technology, culture, or the networked world."
+    },
+    {
+      "type": "overlay-mark",
+      "title": "A mark that behaves, not just identifies",
+      "url": "https://www.itsnicethat.com/articles/mozilla-foundation-pentagram-graphic-design-project-131125",
+      "study": "The NP. mark is described as deliberately simple and able to overlay imagery as both a window and a veil.",
+      "reuse": "Design an editorial mark with placement behavior and an expressive relationship to imagery, rather than limiting it to the masthead."
+    },
+    {
+      "type": "cover-as-entry-point",
+      "title": "Contrast creates the cover energy",
+      "url": "https://www.mozillafoundation.org/en/nothing-personal/",
+      "study": "The platform uses direct headlines, people-centered editorial subjects, and a strong contrast between content modes to establish a magazine-like front door.",
+      "reuse": "Let the first screen establish editorial attitude through scale, contrast, and a single story signal before the archive becomes visible."
+    }
+  ],
+  "typeImageSystems": [
+    {
+      "type": "topographic-display-type",
+      "role": "voice and immediacy",
+      "notes": "The case study describes a large, direct, slightly awkward typographic voice built on Mozilla's type family.",
+      "reuse": "Use a deliberately human display voice against a quieter reading face so the publication can shift from headline attitude to sustained reading."
+    },
+    {
+      "type": "contrast-heavy-image-layer",
+      "role": "editorial emphasis",
+      "notes": "The visual system combines bright contrast, solid blocks, borders, and framing devices with photography or illustration.",
+      "reuse": "Treat image treatment, color fields, and framing as interchangeable layers so each story can have a distinct image while retaining the same publication grammar."
+    }
+  ],
+  "assets": [
+    {
+      "type": "modular-color-blocks",
+      "role": "section framing",
+      "notes": "The source case describes solid blocks and borders as compositional punctuation; this library recreates the principle with original CSS only.",
+      "reuse": "Build a small set of shapes and borders that can frame stories, reviews, and calls to action without copying the source identity."
+    },
+    {
+      "type": "editorial-mark",
+      "role": "identity overlay",
+      "notes": "The external NP. mark is proprietary and is not included in the local preview.",
+      "reuse": "Use an original editorial mark with a similarly behavioral role when prototyping; do not reproduce the source mark."
+    }
+  ],
+  "implementation": {
+    "format": "Responsive web editorial platform with magazine-like hierarchy and mixed media entry points",
+    "complexity": "medium-high",
+    "notes": "The official Mozilla platform verifies the content modes and editorial positioning. The credited case study supplies the visual grammar; implementation details are intentionally limited to observed composition and reuse principles."
+  },
+  "capture": {
+    "date": "2026-07-27",
+    "sourceLinks": [
+      "https://www.mozillafoundation.org/en/nothing-personal/",
+      "https://www.itsnicethat.com/articles/mozilla-foundation-pentagram-graphic-design-project-131125",
+      "https://www.pentagram.com/work/mozilla-foundation"
+    ],
+    "attribution": "Mozilla Foundation; Natasha Jen and team at Pentagram; visual reporting by It's Nice That",
+    "reusePolicy": "inspiration-only",
+    "captureDepth": "case-study"
+  },
+  "status": "accepted"
+}
