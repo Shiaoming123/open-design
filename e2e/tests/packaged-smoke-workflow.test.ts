@@ -1103,6 +1103,7 @@ process.stdin.on("end", () => {
     expect(prWorkflow).not.toContain("git push");
 
     expect(postMergeWorkflow).toContain("permissions:\n  contents: write");
+    expect(postMergeWorkflow).toContain("if: github.repository == 'nexu-io/open-design'");
     expect(postMergeWorkflow).toContain("CLOUDFLARE_R2_REPOSITORY_ASSETS_AK");
     // The write-capable credential the PR path lacks lives here post-merge. The rolling manifest PR
     // is now authored with the release-bot App (so its push triggers CI and the auto-merge reactor
